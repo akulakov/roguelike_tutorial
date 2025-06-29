@@ -1,0 +1,3 @@
+tcod==16.2.1
+numpy>=1.18
+binarytree==6.3.0

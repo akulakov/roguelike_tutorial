@@ -1,0 +1,380 @@
+from copy import copy
+from random import randint, random, choice, choices
+from dataclasses import dataclass
+from game_map import GameMap
+import tile_types
+import entity
+from util import Loc
+
+max_items_by_floor = [
+   (1, 1),
+   (4, 2),
+]
+
+max_monsters_by_floor = [
+   (1, 2),
+   (4, 3),
+   (6, 5),
+]
+
+class RectangularRoom:
+    def __init__(self, x, y, width, height):
+        self.x1 = x
+        self.y1 = y
+        self.x2 = x + width
+        self.y2 = y + height
+        self.p1 = Loc(x,y)
+        self.p2 = Loc(x+width, y+height)
+        self.entries = []
+
+    def __repr__(self):
+        x1,x2,y1,y2 = self.x1, self.x2, self.y1, self.y2
+        return f'<{x1},{y1} {x2},{y2}>'
+
+    @property
+    def center(self):
+        center_x = int((self.x1 + self.x2) / 2)
+        center_y = int((self.y1 + self.y2) / 2)
+        return Loc(center_x, center_y)
+
+    @property
+    def inner(self):
+        return slice(self.x1 + 1, self.x2), slice(self.y1 + 1, self.y2)
+
+    def inner2(self):
+        return Loc(self.x1+2, self.y1+2), Loc(self.x2-2, self.y2-2)
+
+    def walls(self):
+        l = []
+        p1, p2 = self.p1, self.p2
+        for y in range(p1.y, p2.y):
+            l.append(Loc(p1.x, y))
+            l.append(Loc(p2.x, y))
+        for x in range(p1.x, p2.x):
+            l.append(Loc(x, p1.y))
+            l.append(Loc(x, p2.y))
+        return l
+
+    def inner2_locs(self):
+        l = []
+        p1, p2 = self.inner2()
+        for y in range(p1.y, p2.y):
+            for x in range(p1.x, p2.x):
+                l.append(Loc(x,y))
+        return l
+
+    def intersects(self, other):
+        return self.x1 <= other.x2 and self.x2 >= other.x1 and self.y1 <= other.y2 and self.y2 >= other.y1
+
+    def interval_x(self):
+        return Interval(self.x1, self.x2)
+    def interval_y(self):
+        return Interval(self.y1, self.y2)
+
+    def closest_x(self, o):
+        """Closest x coordinates to other room."""
+        if o.x1 > self.x2:
+            return o.x1, self.x2
+        return o.x2, self.x1
+
+    def closest_y(self, o):
+        """Closest y coordinates to other room."""
+        if o.y1 > self.y2:
+            return o.y1, self.y2
+        return o.y2, self.y1
+
+    def horizontal_to(self, o):
+        x1,x2,y1,y2 = self.x1, self.x2, self.y1, self.y2
+        return y2-y1 < x2-x1
+
+def spawn(type, dungeon, engine, loc):
+    m = type(engine, loc.x, loc.y)
+    dungeon.entities.add(m)
+    # m = type(Loc(x, y))
+    #dungeon.place(m)
+
+E = entity
+item_chances = {
+   0: [(E.HealthPotion, 35), (E.ChainMail, 25)],
+   2: [(E.ConfusionScroll, 10)],
+   4: [(E.LightningScroll, 25), (E.Sword, 5)],
+   6: [(E.FireballScroll, 25), (E.ChainMail, 15)],
+}
+
+enemy_chances = {
+   0: [(E.Orc, 80)],
+   3: [(E.Troll, 15)],
+   5: [(E.Troll, 30)],
+   7: [(E.Troll, 60)],
+}
+
+def get_entities_at_random( weighted_chances_by_floor, number_of_entities, floor):
+    entity_weighted_chances = {}
+
+    for key, values in weighted_chances_by_floor.items():
+        if key > floor:
+            break
+        else:
+            for value in values:
+                entity = value[0]
+                weighted_chance = value[1]
+                entity_weighted_chances[entity] = weighted_chance
+
+    entities = list(entity_weighted_chances.keys())
+    entity_weighted_chance_values = list(entity_weighted_chances.values())
+    return choices( entities, weights=entity_weighted_chance_values, k=number_of_entities)
+
+def place_entities(room, dungeon, engine):
+    monsters = get_entities_at_random(enemy_chances, randint(0,2), engine.level)
+    items = get_entities_at_random(item_chances, randint(0,2), engine.level)
+
+    for e in monsters + items:
+        loc = Loc( randint(room.x1 + 1, room.x2 - 1), randint(room.y1 + 1, room.y2 - 1) )
+        if not any(loc==entity.loc for entity in dungeon.entities):
+            # print("engine", engine)
+            if isinstance(engine, int):
+                import pdb;pdb.set_trace()
+            spawn(e, dungeon, engine, loc)
+
+@dataclass
+class Interval:
+    a:int
+    b:int
+
+    def inner(self):
+        return Interval(self.a+2, self.b-2)
+
+    def intersects(self, o):
+        c = max(self.a, o.a)
+        d = min(self.b, o.b)
+        if (d-c) >= 0:
+            return Interval(c, d)
+
+    def intersects_inner(self, o):
+        return self.inner().intersects(o.inner())
+
+    def random(self):
+        return randint(self.a, self.b)
+
+    def __repr__(self):
+        return f'<{self.a}->{self.b}>'
+
+def line(a,b,x=None,y=None):
+    if a>b:
+        a,b = b,a
+    l = []
+    for c in range(a,b+1):
+        if x:
+            l.append((x,c))
+        else:
+            l.append((c,y))
+    return l
+
+def z_line(a, b):
+    """line in a z-shape."""
+    l=[]
+    if abs(a.x-b.x) > abs(a.y-b.y):
+        if a.x>b.x:
+            a,b=b,a
+        m = a.x + int((b.x-a.x)/2)
+        l.extend(line(a.x, m, y=a.y))
+        l.extend(line(a.y, b.y, x=m))
+        l.extend(line(m, b.x, y=b.y))
+    else:
+        if a.y>b.y:
+            a,b=b,a
+        m = a.y + int((b.y-a.y)/2)
+        l.extend(line(a.y, m, x=a.x))
+        l.extend(line(a.x, b.x, y=m))
+        l.extend(line(m, b.y, x=b.x))
+    return l
+
+def l_line(a, b):
+    l = []
+    if a.x>b.x:
+        a,b=b,a
+    l.extend(line(a.x, b.x, y=a.y))
+    l.extend(line(a.y, b.y, x=b.x))
+    return l
+
+
+def generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_height, player, engine, up_map):
+    rooms = []
+    dungeon = GameMap(map_width, map_height, {player}, up_map)
+
+    # set this so that spawned monsters can set it from engine
+    engine.game_map = dungeon
+
+    x_var = 20
+    rm_starts = [[(3,3), (3+x_var,3+5)],
+                 [(25,3), (25+x_var,3+5)],
+                 [(55,3), (55+x_var,3+5)],
+                 [(55,16), (55+x_var,16+5)],
+                 [(25,16), (25+x_var,16+5)],
+                 [(3,16), (3+x_var,16+5)],
+                ]
+
+    tun_locs = set()
+    def adj(tun):
+        """Adjacent to another tunnel."""
+        for x,y in tun:
+            intr = Loc(x,y).adj() & tun_locs
+            if intr:
+                return Loc(*tuple(intr)[0])
+        return False
+
+    for r in range(max_rooms):
+        if random()>.9:
+            continue
+        room_width = randint(room_min_size, room_max_size)
+        room_height = randint(room_min_size, room_max_size)
+
+        c1, c2 = rm_starts[r]
+        x = randint(c1[0], c2[0])
+        y = randint(c1[1], c2[1])
+
+        room_width = env(room_width, dungeon.width-x-1)
+        room_height = env(room_height, dungeon.height-y-1)
+
+        new_room = RectangularRoom(x, y, room_width, room_height)
+
+        if any(new_room.intersects(other_room) for other_room in rooms):
+            continue
+
+
+        if not rooms:
+            if engine.level==0:
+                player.loc = copy(new_room.center)
+        else:
+            tun = None
+            r1 = rooms[-1]
+            r2 = new_room
+            i1 = r1.interval_y()
+            i2 = r2.interval_y()
+            intr = i1.intersects_inner(i2)
+            if not intr:
+                tun = z_line(r1.center, r2.center)
+                if adj(tun):
+                    tun = l_line(r1.center, r2.center)
+                    if adj(tun):
+                        continue
+
+            if not tun:
+                i1 = r1.interval_x()
+                i2 = r2.interval_x()
+                intr2 = i1.intersects_inner(i2)
+
+            if tun:
+                pass
+            elif intr:
+                x1,x2 = r1.closest_x(r2)
+                for n in range(50):
+                    y = intr.random()
+                    i = adj([(x1,y),(x2,y)])
+                    if not i: break
+                    if i.y>y: y-=1
+                    if i.y<y: y+=1
+                    i = adj([(x1,y),(x2,y)])
+                    if not i: break
+                else:
+                    tun = z_line(r1.center, r2.center)
+                    if adj(tun):
+                        tun = l_line(r1.center, r2.center)
+                        if adj(tun):
+                            continue
+
+                tun = tun or line(x1, x2, y=y)
+            elif intr2:
+                x = intr2.random()
+                y1,y2 = r1.closest_y(r2)
+                tun = line(y1, y2, x=x)
+            if set(tun) & tun_locs:
+                continue
+
+            for x,y in tun:
+                dungeon.tiles[x,y] = tile_types.floor
+                tun_locs.add((x,y))
+                r1walls = set(r1.walls())
+                r2walls = set(r2.walls())
+                l = Loc(x,y)
+                if l in r1walls:
+                    r1.entries.append(l)
+                elif l in r2walls:
+                    r2.entries.append(l)
+
+        for r in rooms:
+            print(r)
+            print("r.entries", r.entries)
+            print()
+        dungeon.tiles[new_room.inner] = tile_types.floor
+        place_entities(new_room, dungeon, engine)
+        rooms.append(new_room)
+
+    from game_map import Stairs
+    locs = ()
+    if engine.total_levels <= engine.max_levels:
+        loc = loc2 = 0
+        if random()>.5:
+            for _ in range(50):
+                r = choice(rooms)
+                locs = r.inner2_locs()
+                if locs:
+                    loc = choice(locs)
+                    dungeon.tiles[loc.x, loc.y] = tile_types.down_stairs
+                    break
+        if not loc or random()>.5:
+            for _ in range(50):
+                r = choice(rooms)
+                locs = list(set(r.inner2_locs()) - {loc})
+                if locs:
+                    loc2 = choice(locs)
+                    dungeon.tiles[loc2.x, loc2.y] = tile_types.down_stairs
+                    break
+        locs = loc, loc2
+        if loc and loc2:
+            loc, loc2 = sorted(locs)
+            dungeon.left, dungeon.right = Stairs(loc, down_dir='left'), Stairs(loc2, down_dir='right')
+            print("dungeon.left right", dungeon.left, dungeon.right)
+        else:
+            dir = choice(('left','right'))
+            setattr(dungeon, dir, Stairs(loc or loc2, down_dir=dir))
+        print("dungeon.left", dungeon.left)
+        print("dungeon.right", dungeon.right)
+
+    if engine.level > 0:
+        for _ in range(50):
+            r = choice(rooms)
+            locs2 = list(set(r.inner2_locs()) - set(locs))
+            if locs2:
+                loc = choice(locs2)
+                dungeon.tiles[loc.x, loc.y] = tile_types.up_stairs
+                dungeon.up = Stairs(loc, above_loc=player.loc, game_map=up_map)
+                break
+        else:
+            raise Exception('No tile found for up_stairs')
+
+    engine.total_levels += 1
+    dungeon.rooms = rooms
+    return dungeon
+
+def env(val, max, min=0):
+    if val>max:
+        val = max
+    if val<min:
+        val = min
+    return val
+
+import tcod
+def tunnel_between(start, end):
+    x1, y1 = start
+    x2, y2 = end
+    if random() < 0.5:
+        corner_x, corner_y = x2, y1
+
+    else:
+        corner_x, corner_y = x1, y2
+
+    for t in tcod.los.bresenham((x1, y1), (corner_x, corner_y)).tolist():
+        yield t
+    for t in tcod.los.bresenham((corner_x, corner_y), (x2, y2)).tolist():
+        yield t
