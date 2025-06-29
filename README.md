@@ -1,7 +1,7 @@
 Roguelike tutorial
 
-This tutorial is to some degree based on tutorial-tcodlib, it has the same functionality at the end of that tutorial and
-the goal is to push it further.
+This tutorial is to some degree based on the excellent tcod-tutorial (TStand90), it has the same functionality at the
+end of that tutorial and the goal is to push it further.
 
 Some notable differences:
 
