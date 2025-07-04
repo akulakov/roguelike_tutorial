@@ -55,6 +55,19 @@ class RectangularRoom:
             l.append(Loc(x, p2.y))
         return l
 
+    def locs(self, check=None):
+        """`check` func will result in early return"""
+        l = []
+        p1, p2 = self.p1, self.p2
+        for y in range(p1.y, p2.y):
+            for x in range(p1.x, p2.x):
+                loc = Loc(x, y)
+                if check and check(loc):
+                    return
+                else:
+                    l.append(loc)
+        return l
+
     def inner2_locs(self):
         l = []
         p1, p2 = self.inner2()
@@ -64,7 +77,7 @@ class RectangularRoom:
         return l
 
     def intersects(self, other):
-        return self.x1 <= other.x2 and self.x2 >= other.x1 and self.y1 <= other.y2 and self.y2 >= other.y1
+        return self.x1-1 <= other.x2 and self.x2+1 >= other.x1 and self.y1-1 <= other.y2 and self.y2+1 >= other.y1
 
     def interval_x(self):
         return Interval(self.x1, self.x2)
@@ -90,8 +103,6 @@ class RectangularRoom:
 def spawn(type, dungeon, engine, loc):
     m = type(engine, loc.x, loc.y)
     dungeon.entities.add(m)
-    # m = type(Loc(x, y))
-    #dungeon.place(m)
 
 E = entity
 item_chances = {
@@ -103,7 +114,7 @@ item_chances = {
 
 enemy_chances = {
    0: [(E.Orc, 80)],
-   3: [(E.Troll, 15)],
+   3: [(E.BroomTroll, 85)],
    5: [(E.Troll, 30)],
    7: [(E.Troll, 60)],
 }
@@ -303,9 +314,7 @@ def generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_hei
                     r2.entries.append(l)
 
         for r in rooms:
-            print(r)
-            print("r.entries", r.entries)
-            print()
+            pass
         dungeon.tiles[new_room.inner] = tile_types.floor
         place_entities(new_room, dungeon, engine)
         rooms.append(new_room)
@@ -334,12 +343,9 @@ def generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_hei
         if loc and loc2:
             loc, loc2 = sorted(locs)
             dungeon.left, dungeon.right = Stairs(loc, down_dir='left'), Stairs(loc2, down_dir='right')
-            print("dungeon.left right", dungeon.left, dungeon.right)
         else:
             dir = choice(('left','right'))
             setattr(dungeon, dir, Stairs(loc or loc2, down_dir=dir))
-        print("dungeon.left", dungeon.left)
-        print("dungeon.right", dungeon.right)
 
     if engine.level > 0:
         for _ in range(50):
@@ -355,7 +361,47 @@ def generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_hei
 
     engine.total_levels += 1
     dungeon.rooms = rooms
+
+    hidden_room(dungeon, rooms, map_width, map_height)
+
     return dungeon
+
+def hidden_room_tunnel(dungeon, room):
+    lst = dungeon.find_walkable(room.p1.mod(1,0), Loc(0,-1))
+    if lst: return lst
+
+    lst = dungeon.find_walkable(room.p1.mod(0,1), Loc(-1,0))
+    if lst: return lst
+
+    lst = dungeon.find_walkable(room.p2.mod(0,-1), Loc(1,0))
+    if lst: return lst
+
+    lst = dungeon.find_walkable(room.p2.mod(-1,0), Loc(0,1))
+    if lst: return lst
+
+
+def hidden_room(dungeon, rooms, map_width, map_height):
+    # if not random()>.75:
+        # return
+    for _ in range(50):
+        x,y = randint(2,map_width-2), randint(2,map_height-2)
+        r = RectangularRoom(x, y, 3, 3)
+        if any(r.intersects(_r) for _r in rooms):
+            continue
+        locs = r.locs()
+        if not any(dungeon.walkable(l) for l in locs):
+            lst = hidden_room_tunnel(dungeon, r)
+            if not lst:
+                continue
+
+            for loc in lst[:-1]:
+                dungeon.tiles[loc.x, loc.y] = tile_types.floor
+            loc = lst[-1]
+            dungeon.tiles[loc.x, loc.y] = tile_types.hidden_passage
+            dungeon.hidden_rooms = [r]
+            dungeon.hidden_tile = loc
+            dungeon.tiles[r.inner] = tile_types.floor
+            return r
 
 def env(val, max, min=0):
     if val>max:

@@ -1,4 +1,5 @@
 from game_map import Color
+from util import Loc
 
 class Action:
     def init(self, engine=None, e1=None, e2=None, item=None):
@@ -25,7 +26,6 @@ class Impossible(Exception):
 class QuitWithoutSaving(SystemExit):
     pass
 
-from util import Loc
 class MovementAction(DirectionAction):
     def perform(self, move=True):
         mod = self.mod

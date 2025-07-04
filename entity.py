@@ -18,6 +18,7 @@ class Entity:
     level = None
     name = None
     entity = None
+    _inventory = ()
 
     def __init__(self, engine, x=None, y=None, char=None, color=None, name=None, blocking=False):
         # print("engine", engine)
@@ -31,6 +32,8 @@ class Entity:
         self.name = self.name or name or self.__class__.__name__
         self.engine = engine
         self.inventory = Inventory(engine, self, 20)
+        for i in self._inventory:
+            self.inventory.add(i(engine))
         self.equipment = Equipment(self)
         self.add_engine(engine)
 
@@ -96,7 +99,31 @@ class Hostile(Living):
     path = None
     confused = None
 
+    def handle_pickup(self):
+        pickup = False
+        if not self.equipment.fully_equipped():
+            items = self.game_map.get_entities_at_loc(self.loc)
+            for i in items:
+                if isinstance(i, Equippable):
+                    if self.equipment.slot_available(i):
+                        self.game_map.entities.remove(i)
+                        self.inventory.add(i)
+                        pickup = True
+        return pickup
+
+    def handle_equipment(self):
+        inv = self.inventory
+        if not self.equipment.fully_equipped() and inv:
+            for i in inv:
+                if isinstance(i, Equippable):
+                    if self.equipment.slot_available(i):
+                        self.equipment.equip_to_slot(i)
+                        break
+
     def attack(self, target):
+        if self.handle_pickup():
+            return
+        self.handle_equipment()
         if self.confused:
             mod = Loc(*choice(list(input_handlers.dir_keys.values())))
             a = BumpAction(mod)
@@ -209,6 +236,33 @@ class ConfusionScroll(Item):
         target.confused = self.duration
         self.container.remove(self)
 
+class DoorOnFireScroll(Item):
+    char = '~'
+    color = 111, 11, 125
+    name = 'Door on Fire Scroll'
+    damage = 12
+
+    def activate(self):
+        e1 = self.container.entity
+        loc = e1.loc
+        map = self.engine.game_map
+        r = map.find_room(loc)
+        if not r:
+            self.engine.messages.add('This spell requires caster to be in a room.')
+            return
+        b = map.get_living_at_locs(r.center.adj_locs(include_self=True))
+        b = set(b) - {e1}
+        for e in b:
+            e.fighter.take_damage(self.damage)
+        if len(b)==1:
+            self.engine.messages.add(f'{b[0]} was struck by {self.name}.')
+        elif len(b)==0:
+            self.engine.messages.add(f'{self.name} burns empty space.')
+        else:
+            self.engine.messages.add(f'{len(b)} monsters were struck by {self.name}.')
+        self.container.remove(self)
+
+
 class EyeOfIceScroll(Item):
     char = '~'
     color = 111, 111, 125
@@ -275,6 +329,13 @@ class Weapon(Equippable):
     pass
 class Armor(Equippable):
     pass
+class Tool(Equippable):
+    pass
+
+class Broom(Tool):
+    char = '['
+    color = 0, 95, 225
+    power_bonus = 1
 
 class Dagger(Weapon):
     char = '/'
@@ -295,3 +356,11 @@ class ChainMail(Armor):
     char = '['
     color = 35, 1, 255
     defense_bonus = 3
+
+class BroomTroll(Hostile):
+    char = 'T'
+    color = 0,127,50
+    name = 'Broom Troll'
+    fighter = 20,3,4
+    _inventory = [Broom]
+

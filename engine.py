@@ -132,10 +132,11 @@ class Engine:
         for e in self.game_map.entities - {self.player}:
             if e.is_hostile:
                 a = e.attack(self.player)
-                try:
-                    a.perform()
-                except Impossible:
-                    pass
+                if a:
+                    try:
+                        a.perform()
+                    except Impossible:
+                        pass
 
     def update_fov(self):
         """Recompute the visible area based on the players point of view."""

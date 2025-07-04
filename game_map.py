@@ -50,6 +50,8 @@ class GameMap:
     right = None
     level = None
     rooms = None
+    hidden_rooms = None
+    reveal = False
 
     def __init__(self, width, height, entities, level, up_map=None):
         self.level = level
@@ -86,6 +88,9 @@ class GameMap:
             if entity.blocking and entity.loc==loc:
                 return entity
 
+    def get_entities_at_loc(self, loc):
+        return [e for e in self.entities if e.loc==loc]
+
     def get_living_at_locs(self, locs):
         locs = set(locs)
         l = []
@@ -116,19 +121,24 @@ class GameMap:
     def empty_lst_bool(self, locs):
         return [self.empty(l) for l in locs]
 
+    def walkable(self, loc):
+        return self.tiles['walkable'][loc.x, loc.y]
+
     def empty(self, loc):
         if not self.in_bounds(loc):
             return False
-        if not self.tiles["walkable"][loc.x, loc.y]:
+        if not self.tiles['walkable'][loc.x, loc.y]:
             return False
         if self.get_blocking_entity_at_loc(loc):
             return False
         return True
 
     def render(self, engine, console):
+        if self.reveal:
+            self.visible = np.full((self.width, self.height), fill_value=True, order='F')
         console.rgb[0:self.width, 0:self.height] = np.select(
             condlist=[self.visible, self.explored],
-            choicelist=[self.tiles["light"], self.tiles["dark"]],
+            choicelist=[self.tiles['light'], self.tiles['dark']],
             default=tile_types.SHROUD
         )
 
@@ -142,7 +152,7 @@ class GameMap:
         self.render_bar(console, f.hp, f.max_hp, 20)
         self.render_names_at_location(console, engine.mouse_loc, Loc(21,44))
         engine.messages.render(console, 21, 45, 40, 5)
-        console.print( x=1, y=47, string=f"{engine.player.loc}")
+        console.print( x=1, y=47, string=f'{engine.player.loc}')
 
     def render_bar(self, console, current_value, maximum_value, total_width):
         bar_width = int(float(current_value) / maximum_value * total_width)
@@ -154,6 +164,15 @@ class GameMap:
 
         console.print( x=1, y=46, string=f"HP: {current_value}/{maximum_value}", fg=Color.bar_text)
 
+    def find_walkable(self, loc, dir):
+        l = [loc]
+        for _ in range(100):
+            loc = loc.mod(dir.x, dir.y)
+            if not self.in_bounds(loc):
+                return
+            if self.walkable(loc):
+                return l
+            l.append(loc)
 
 
 class Message:

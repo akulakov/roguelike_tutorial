@@ -2,10 +2,11 @@
 class Equipment:
     entity = None
 
-    def __init__(self, entity, weapon=None, armor=None):
+    def __init__(self, entity, weapon=None, armor=None, tool=None):
         self.entity = entity
         self.weapon = weapon
         self.armor = armor
+        self.tool = tool
 
     @property
     def defense_bonus(self):
@@ -14,7 +15,12 @@ class Equipment:
             bonus += self.weapon.defense_bonus
         if self.armor:
             bonus += self.armor.defense_bonus
+        if self.tool:
+            bonus += self.tool.defense_bonus
         return bonus
+
+    def fully_equipped(self):
+        return self.weapon and self.armor and self.tool
 
     @property
     def power_bonus(self):
@@ -23,18 +29,21 @@ class Equipment:
             bonus += self.weapon.power_bonus
         if self.armor:
             bonus += self.armor.power_bonus
+        if self.tool:
+            bonus += self.tool.power_bonus
         return bonus
 
     def item_is_equipped(self, item):
-        return self.weapon == item or self.armor == item
+        return self.weapon == item or self.armor == item or self.tool==item
 
     def unequip_message(self, item_name):
-        self.entity.engine.messages.add(f'You remove the {item_name}.')
+        self.entity.engine.messages.add(f'{self.entity} removes the {item_name}.')
 
     def equip_message(self, item_name):
-        self.entity.engine.messages.add( f'You equip the {item_name}.')
+        self.entity.engine.messages.add( f'{self.entity} equips the {item_name}.')
 
-    def equip_to_slot(self, slot, item, add_message):
+    def equip_to_slot(self, item, add_message=True, slot=None):
+        slot = slot or self.get_slot(item)
         current_item = getattr(self, slot)
         if current_item:
             self.unequip_from_slot(slot, add_message)
@@ -43,7 +52,7 @@ class Equipment:
         if add_message:
             self.equip_message(item.name)
 
-    def unequip_from_slot(self, slot, add_message):
+    def unequip_from_slot(self, slot, add_message=True):
         current_item = getattr(self, slot)
 
         if add_message:
@@ -51,17 +60,25 @@ class Equipment:
 
         setattr(self, slot, None)
 
-    def toggle_equip(self, item, add_message=True):
-        from entity import Weapon
+    def get_slot(self, item):
+        from entity import Weapon, Armor
         if isinstance(item, Weapon):
-            slot = 'weapon'
+            return 'weapon'
+        if isinstance(item, Armor):
+            return 'armor'
         else:
-            slot = 'armor'
+            return 'tool'
 
+    def slot_available(self, item=None, slot=None, ):
+        slot = slot or self.get_slot(item)
+        return not getattr(self, slot)
+
+    def toggle_equip(self, item, add_message=True):
+        slot = self.get_slot(item)
         if getattr(self, slot) == item:
             self.unequip_from_slot(slot, add_message)
         else:
-            self.equip_to_slot(slot, item, add_message)
+            self.equip_to_slot(item, add_message)
 
 
 class CharLevel:
@@ -176,6 +193,12 @@ class Inventory:
         self.items = []
         if engine:
             self.game_map = engine.game_map
+
+    def __bool__(self):
+        return bool(self.items)
+
+    def __iter__(self):
+        return iter(self.items)
 
     def add(self, item):
         self.items.append(item)

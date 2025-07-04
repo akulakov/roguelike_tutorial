@@ -5,6 +5,7 @@ from tcod import libtcodpy
 from actions import BumpAction, WaitAction, MovementAction, PickupAction, Impossible, DropItem
 from util import Loc
 from game_map import Color
+import tile_types
 
 dir_keys = dict(
     y=(-1,-1), u=(1,-1), b=(-1,1), n=(1,1),
@@ -39,19 +40,25 @@ class EventHandler(tcod.event.EventDispatch):
                     mod = self.fast_go(mod)
                 action = BumpAction(mod)
         self.go = False
-        # print("keys", list(keys))
-        mod = event.mod
-        m = self.game_map
+        Modifier = tcod.event.Modifier
+        Shift = event.mod & tcod.event.Modifier.SHIFT
         if key == keys.g:
             self.go = True
-        elif key == keys.PERIOD and mod & (keys.LSHIFT | keys.RSHIFT):
+        elif key == keys.PERIOD and Shift:
             m = self.game_map
             stairs = tuple(filter(None, (m.left, m.right)))
             if self.player.loc in (s.loc for s in stairs):
                 self.engine.down()
-        elif key == keys.COMMA and mod & (keys.LSHIFT | keys.RSHIFT):
+        elif key == keys.COMMA and Shift:
             if self.player.loc == self.game_map.up.loc:
                 self.engine.up()
+        elif key == keys.s and Shift:
+            for l in self.player.loc.adj():
+                if self.game_map.tiles[l] == tile_types.hidden_passage:
+                    self.game_map.tiles[l] = tile_types.floor
+            else:
+                engine.messages.add('You do not find anything hidden.')
+
         elif key == keys.PERIOD:
             action = WaitAction()
         elif key == keys.v:
@@ -68,6 +75,8 @@ class EventHandler(tcod.event.EventDispatch):
             action = PickupAction()
         elif key == keys.d:
             self.engine.event_handler = InventoryDropHandler(self.engine)
+        elif key == keys.r and Shift:
+            self.game_map.reveal = not self.game_map.reveal
 
         if action:
             action.init(engine, self.player)
@@ -320,7 +329,7 @@ class SelectIndexHandler(AskUserEventHandler):
         for k in dir_keys:
             if key==getattr(keys, k):
                 modifier = 1
-                if event.mod & (tcod.event.KeySym.LSHIFT | tcod.event.KeySym.RSHIFT):
+                if event.mod & tcod.event.Modifier.SHIFT:
                     modifier *= 5
                 if event.mod & (tcod.event.KeySym.LCTRL | tcod.event.KeySym.RCTRL):
                     modifier *= 10
