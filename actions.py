@@ -38,6 +38,11 @@ class MovementAction(DirectionAction):
             raise Impossible('Blocked')
         if move:
             self.e1.move(self.mod)
+            if self.e1.is_player:
+                items = self.engine.game_map.names_at_loc(self.e1.loc, {self.e1})
+                if items:
+                    self.engine.messages.add(f'You see {items}')
+
         return True
 
 from random import randint, random

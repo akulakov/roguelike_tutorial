@@ -40,7 +40,6 @@ class EventHandler(tcod.event.EventDispatch):
                     mod = self.fast_go(mod)
                 action = BumpAction(mod)
         self.go = False
-        Modifier = tcod.event.Modifier
         Shift = event.mod & tcod.event.Modifier.SHIFT
         if key == keys.g:
             self.go = True

@@ -78,6 +78,10 @@ class GameMap:
        names = names.capitalize()
        console.print(x=r_loc.x, y=r_loc.y, string=names)
 
+    def names_at_loc(self, loc, exclude=()):
+       names = ', '.join( e.name for e in self.entities if e.loc==loc and e not in exclude)
+       return names.capitalize()
+
     def place(self, item, loc=None):
         self.entities.add(item)
         if loc:

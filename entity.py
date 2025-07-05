@@ -19,6 +19,7 @@ class Entity:
     name = None
     entity = None
     _inventory = ()
+    xp_given = 10
 
     def __init__(self, engine, x=None, y=None, char=None, color=None, name=None, blocking=False):
         # print("engine", engine)
@@ -92,7 +93,7 @@ class Living(Blocking):
         if self.fighter:
             self.fighter = Fighter(self, *self.fighter)
         super().__init__(*a, **kw)
-        self.level = CharLevel(self.engine, self)
+        self.level = CharLevel(self.engine, self, xp_given=self.xp_given)
 
 class Hostile(Living):
     is_hostile = True
@@ -317,7 +318,9 @@ class FireballScroll(Item):
         self.container.remove(self)
 
 class Equippable(Item):
-    def __init__(self, *a, power_bonus=0, defense_bonus=0, **kw):
+    def __init__(self, *a, power_bonus=0, defense_bonus=0, entity=None, **kw):
+        print("a", a)
+        self.entity = entity
         self.power_bonus = self.power_bonus or power_bonus
         self.defense_bonus = self.defense_bonus or defense_bonus
         super().__init__(*a, **kw)
@@ -326,41 +329,99 @@ class Equippable(Item):
         self.entity.equipment.toggle_equip(self)
 
 class Weapon(Equippable):
-    pass
+    char = '/'
 class Armor(Equippable):
-    pass
+    char = '['
 class Tool(Equippable):
-    pass
+    char = ']'
 
 class Broom(Tool):
-    char = '['
     color = 0, 95, 225
     power_bonus = 1
 
 class Dagger(Weapon):
-    char = '/'
     color = 0, 191, 255
     power_bonus = 2
 
 class Sword(Weapon):
-    char = '/'
     color = 0, 91, 255
     power_bonus = 4
 
 class LeatherArmor(Armor):
-    char = '['
     color = 0, 1, 255
     defense_bonus = 2
 
 class ChainMail(Armor):
-    char = '['
     color = 35, 1, 255
     defense_bonus = 3
 
+class BurlyArmor(Armor):
+    color = 35,25,75
+    defense_bonus = 5
+
+class CreakingArmor(Armor):
+    """This armor creaks when being hit which dissipates some of the damage."""
+    color = 35,105,105
+    defense_bonus = 7
+
 class BroomTroll(Hostile):
+    """These Trolls developed immense strength and toughness by spending years upon years of sweeping the dank,
+    dangerous dungeons of dried carcasses of small animals, skulls of adventurers and various decomposing piles of
+    unknown origin."""
     char = 'T'
     color = 0,127,50
     name = 'Broom Troll'
     fighter = 20,3,4
     _inventory = [Broom]
+    xp_given = 50
+
+class ThwackingOrc(Orc):
+    """These Orcs thwacks, with great force, anyone and anything unfriendly that comes near."""
+    color = 0,65,65
+    name = 'Thwacking Orc'
+    fighter = 22,4,5
+    xp_given = 60
+
+class BurningOrc(Orc):
+    """These Orcs are a mixed population with some type of fire-breathing creatures. There is on-going research by Mages
+    and Sages into this question."""
+    color = 150,50,50
+    name = 'Burning Orc'
+    fighter = 24,6,6
+    xp_given = 70
+
+class ResoluteOrc(Orc):
+    """These Orcs have unbending will in battle. They do not back down unless they decide to do so for tactical or strategic reasons."""
+    color = 50,120,130
+    name = 'Resolute Orc'
+    fighter = 28,7,8
+    xp_given = 80
+
+class KnurledGoblin(Hostile):
+    """The hide of these Goblins is thick and knurled, increasing their doughtiness to rarely seen level."""
+    color = 65,65,95
+    name = 'Knurled Goblin'
+    fighter = 30,9,9
+    xp_given = 90
+
+class MusculousGoblin(Hostile):
+    """These Goblins are well known for the strength, muscles and powerful blows they rain on all foes."""
+    color = 75,95,105
+    name = 'Musculous Goblin'
+    fighter = 32,10,12
+    xp_given = 110
+
+class SatyricGoblin(Hostile):
+    """These Goblins were mixed with the feared tribe of Satyrs, giving them impressive sturdiness and power."""
+    color = 75,65,55
+    name = 'Satyric Goblin'
+    fighter = 35,13,13
+    xp_given = 130
+
+class InsuperableTroll(Troll):
+    """These Trolls are """
+    color = 65,105,105
+    name = 'Insuperable Troll'
+    fighter = 37,14,15
+    xp_given = 160
 

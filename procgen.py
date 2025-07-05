@@ -110,6 +110,7 @@ item_chances = {
    2: [(E.ConfusionScroll, 10)],
    4: [(E.LightningScroll, 25), (E.Sword, 5)],
    6: [(E.FireballScroll, 25), (E.ChainMail, 15)],
+   8: [(E.BurlyArmor, 10), (E.CreakingArmor, 5)],
 }
 
 enemy_chances = {
@@ -117,6 +118,13 @@ enemy_chances = {
    3: [(E.BroomTroll, 85)],
    5: [(E.Troll, 30)],
    7: [(E.Troll, 60)],
+   8: [(E.ThwackingOrc, 40)],
+   9: [(E.BurningOrc, 40)],
+   10: [(E.ResoluteOrc, 40)],
+   11: [(E.KnurledGoblin, 40)],
+   12: [(E.MusculousGoblin, 40)],
+   13: [(E.SatyricGoblin, 40)],
+   14: [(E.InsuperableTroll, 40)],
 }
 
 def get_entities_at_random( weighted_chances_by_floor, number_of_entities, floor):
@@ -142,9 +150,6 @@ def place_entities(room, dungeon, engine):
     for e in monsters + items:
         loc = Loc( randint(room.x1 + 1, room.x2 - 1), randint(room.y1 + 1, room.y2 - 1) )
         if not any(loc==entity.loc for entity in dungeon.entities):
-            # print("engine", engine)
-            if isinstance(engine, int):
-                import pdb;pdb.set_trace()
             spawn(e, dungeon, engine, loc)
 
 @dataclass
@@ -384,7 +389,7 @@ def hidden_room(dungeon, rooms, map_width, map_height):
     # if not random()>.75:
         # return
     for _ in range(50):
-        x,y = randint(2,map_width-2), randint(2,map_height-2)
+        x,y = randint(3,map_width-3), randint(3,map_height-3)
         r = RectangularRoom(x, y, 3, 3)
         if any(r.intersects(_r) for _r in rooms):
             continue

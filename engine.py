@@ -176,8 +176,8 @@ def new_game():
     player.add_engine(engine)
     player.inventory.add(entity.FireballScroll(engine))
     player.inventory.add(entity.EyeOfIceScroll(engine))
-    player.inventory.add(entity.Sword(player, engine))
-    player.inventory.add(entity.LeatherArmor(player, engine))
+    player.inventory.add(entity.Sword(engine, entity=player))
+    player.inventory.add(entity.LeatherArmor(engine, entity=player))
     EventHandler(engine)
     engine.update_fov()
     return engine, screen_width, screen_height, tileset
