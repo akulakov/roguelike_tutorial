@@ -2,21 +2,21 @@ Tutorial: Fragment of a fallen shrine
 
 * main game loop:
 
-https://github.com/akulakov/roguelike_tutorial/blob/42b0cf21138fe83cc69753de61b31c14a9e356b1/main.py#L11
+    https://github.com/akulakov/roguelike_tutorial/blob/42b0cf21138fe83cc69753de61b31c14a9e356b1/main.py#L11
 
-The main loop does the following:
+    The main loop does the following:
 
     * gets the action from the event handler and tries to perform it
     * handle enemy turns - see entity.Hostile.attack()
     * heal the player (todo - monsters should also self-heal)
 
-It's good to look at input_handlers.EventHandler which has all the player commands.
+    It's good to look at input_handlers.EventHandler which has all the player commands.
 
 * dungeon generator - procgen.py
 
-https://github.com/akulakov/roguelike_tutorial/blob/42b0cf21138fe83cc69753de61b31c14a9e356b1/procgen.py#L212
+    https://github.com/akulakov/roguelike_tutorial/blob/42b0cf21138fe83cc69753de61b31c14a9e356b1/procgen.py#L212
 
-generator does the following (it's getting too big and should be refactored into more functions?):
+    generator does the following (it's getting too big and should be refactored into more functions?):
 
     * create an instance of GameMap (contains the array of dungeon level tiles, entities, etc.)
     * generate random rooms. Rooms are roughly located at 6 points evenly spread on the level but then their locations
