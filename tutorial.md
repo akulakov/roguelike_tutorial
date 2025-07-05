@@ -1,6 +1,6 @@
 Tutorial: Fragment of a fallen shrine
 
-1. main game loop:
+* main game loop:
 
 https://github.com/akulakov/roguelike_tutorial/blob/42b0cf21138fe83cc69753de61b31c14a9e356b1/main.py#L11
 
@@ -12,7 +12,7 @@ The main loop does the following:
 
 It's good to look at input_handlers.EventHandler which has all the player commands.
 
-2. dungeon generator - procgen.py
+* dungeon generator - procgen.py
 
 https://github.com/akulakov/roguelike_tutorial/blob/42b0cf21138fe83cc69753de61b31c14a9e356b1/procgen.py#L212
 
