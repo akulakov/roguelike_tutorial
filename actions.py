@@ -77,12 +77,16 @@ class BumpAction(DirectionAction):
         mod = self.mod
         loc = Loc(cloc.x+mod.x, cloc.y+mod.y)
 
-        if self.engine.game_map.get_blocking_entity_at_loc(loc):
+        ent = self.engine.game_map.get_blocking_entity_at_loc(loc)
+        is_player = self.e1.is_player
+        a = None
+        if not is_player or is_player and ent and ent.is_hostile:
             a = MeleeAction(mod)
-        else:
+        elif not ent:
             a = MovementAction(mod)
-        a.init(self.engine, self.e1)
-        return a.perform()
+        if a:
+            a.init(self.engine, self.e1)
+            return a.perform()
 
 class PickupAction(Action):
    def perform(self):

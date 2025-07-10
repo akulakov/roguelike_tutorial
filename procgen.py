@@ -152,6 +152,13 @@ def place_entities(room, dungeon, engine):
         if not any(loc==entity.loc for entity in dungeon.entities):
             spawn(e, dungeon, engine, loc)
 
+def place_special(room, dungeon, engine, cls):
+    for _ in range(50):
+        loc = Loc( randint(room.x1 + 1, room.x2 - 1), randint(room.y1 + 1, room.y2 - 1) )
+        if not any(loc==entity.loc for entity in dungeon.entities):
+            spawn(cls, dungeon, engine, loc)
+            return
+
 @dataclass
 class Interval:
     a:int
@@ -239,6 +246,7 @@ def generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_hei
                 return Loc(*tuple(intr)[0])
         return False
 
+    rnum = 1
     for r in range(max_rooms):
         if random()>.9:
             continue
@@ -324,6 +332,12 @@ def generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_hei
         place_entities(new_room, dungeon, engine)
         rooms.append(new_room)
 
+        cls = entity.special_locs.get((engine.level,rnum))
+        if cls:
+            print('placing ', cls)
+            place_special(new_room, dungeon, engine, cls)
+        rnum += 1
+
     from game_map import Stairs
     locs = ()
     if engine.total_levels <= engine.max_levels:
@@ -334,16 +348,18 @@ def generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_hei
                 locs = r.inner2_locs()
                 if locs:
                     loc = choice(locs)
-                    dungeon.tiles[loc.x, loc.y] = tile_types.down_stairs
-                    break
+                    if not dungeon.get_entities_at_loc(loc):
+                        dungeon.tiles[loc.x, loc.y] = tile_types.down_stairs
+                        break
         if not loc or random()>.5:
             for _ in range(50):
                 r = choice(rooms)
                 locs = list(set(r.inner2_locs()) - {loc})
                 if locs:
                     loc2 = choice(locs)
-                    dungeon.tiles[loc2.x, loc2.y] = tile_types.down_stairs
-                    break
+                    if not dungeon.get_entities_at_loc(loc2):
+                        dungeon.tiles[loc2.x, loc2.y] = tile_types.down_stairs
+                        break
         locs = loc, loc2
         if loc and loc2:
             loc, loc2 = sorted(locs)

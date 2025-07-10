@@ -81,13 +81,16 @@ class Blocking(Entity):
     blocking = True
 
 class Item(Entity):
+    base_price = 0
     power_bonus = 0
     defense_bonus = 0
     container = None
 
 class Living(Blocking):
     is_alive = True
+    is_seller = False
     render_order = 3
+    gold = 0
 
     def __init__(self, *a, **kw):
         if self.fighter:
@@ -187,6 +190,7 @@ class HealthPotion(HealingItem):
     color = 127,0,255
     name = 'Health Potion'
     amount = 4
+    base_price = 10
 
 class LightningScroll(Item):
     char = '~'
@@ -194,6 +198,7 @@ class LightningScroll(Item):
     name = 'Lightning Scroll'
     damage = 5
     maximum_range = 5
+    base_price = 20
 
     def activate(self):
         target = None
@@ -220,6 +225,7 @@ class ConfusionScroll(Item):
     color = 127, 100, 100
     name = 'Confusion Scroll'
     duration = 7
+    base_price = 20
 
     def activate(self):
         self.engine.messages.add( "Select a target location.", Color.needs_target)
@@ -242,6 +248,7 @@ class DoorOnFireScroll(Item):
     color = 111, 11, 125
     name = 'Door on Fire Scroll'
     damage = 12
+    base_price = 30
 
     def activate(self):
         e1 = self.container.entity
@@ -269,6 +276,7 @@ class EyeOfIceScroll(Item):
     color = 111, 111, 125
     name = 'Eye of Ice Storm Scroll'
     damage = 15
+    base_price = 30
 
     def activate(self):
         e1 = self.container.entity
@@ -297,6 +305,7 @@ class FireballScroll(Item):
     name = 'Fireball Scroll'
     damage = 6
     radius = 5
+    base_price = 30
 
     def activate(self):
         self.engine.messages.add( 'Select a target location.', Color.needs_target)
@@ -319,7 +328,6 @@ class FireballScroll(Item):
 
 class Equippable(Item):
     def __init__(self, *a, power_bonus=0, defense_bonus=0, entity=None, **kw):
-        print("a", a)
         self.entity = entity
         self.power_bonus = self.power_bonus or power_bonus
         self.defense_bonus = self.defense_bonus or defense_bonus
@@ -338,31 +346,45 @@ class Tool(Equippable):
 class Broom(Tool):
     color = 0, 95, 225
     power_bonus = 1
+    base_price = 5
+
+class Abacus(Tool):
+    color = 0, 50, 100
+    base_price = 5
+
+    def activate(self):
+        self.engine.messages.add(f'{self.entity} calculates a few numbers.')
 
 class Dagger(Weapon):
     color = 0, 191, 255
     power_bonus = 2
+    base_price = 10
 
 class Sword(Weapon):
     color = 0, 91, 255
     power_bonus = 4
+    base_price = 25
 
 class LeatherArmor(Armor):
     color = 0, 1, 255
     defense_bonus = 2
+    base_price = 25
 
 class ChainMail(Armor):
     color = 35, 1, 255
     defense_bonus = 3
+    base_price = 35
 
 class BurlyArmor(Armor):
     color = 35,25,75
     defense_bonus = 5
+    base_price = 45
 
 class CreakingArmor(Armor):
     """This armor creaks when being hit which dissipates some of the damage."""
     color = 35,105,105
     defense_bonus = 7
+    base_price = 70
 
 class BroomTroll(Hostile):
     """These Trolls developed immense strength and toughness by spending years upon years of sweeping the dank,
@@ -406,6 +428,7 @@ class KnurledGoblin(Hostile):
 
 class MusculousGoblin(Hostile):
     """These Goblins are well known for the strength, muscles and powerful blows they rain on all foes."""
+    char = 'g'
     color = 75,95,105
     name = 'Musculous Goblin'
     fighter = 32,10,12
@@ -413,6 +436,7 @@ class MusculousGoblin(Hostile):
 
 class SatyricGoblin(Hostile):
     """These Goblins were mixed with the feared tribe of Satyrs, giving them impressive sturdiness and power."""
+    char = 'g'
     color = 75,65,55
     name = 'Satyric Goblin'
     fighter = 35,13,13
@@ -424,4 +448,34 @@ class InsuperableTroll(Troll):
     name = 'Insuperable Troll'
     fighter = 37,14,15
     xp_given = 160
+
+from enum import Enum, auto
+class IDs(Enum):
+    julius_mattius = auto()
+
+class JuliusMattius(Troll):
+    color = 250, 50, 155
+    is_seller = True
+    name = 'Julius Mattius'
+    id = IDs.julius_mattius
+    _loc = 0,1  # level 2, room 1
+    is_hostile = False
+    _inventory = [FireballScroll, Sword, LeatherArmor, Broom]
+    gold = 500
+
+
+class SpecialLocs:
+    def __init__(self):
+        self.data = {}
+        for obj in globals().values():
+            try:
+                if issubclass(obj, Living,) and hasattr(obj,'_loc'):
+                    self.data[obj._loc] = obj
+            except TypeError:
+                pass
+
+    def get(self, k):
+        return self.data.get(k)
+
+special_locs = SpecialLocs()
 

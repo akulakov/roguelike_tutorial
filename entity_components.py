@@ -206,8 +206,9 @@ class Inventory:
 
     def drop(self, item):
         self.items.remove(item)
-        self.game_map.place(item, self.entity.loc)
-        self.engine.messages.add(f"{self.entity} dropped the {item}.")
+        eng = self.entity.engine
+        eng.game_map.place(item, self.entity.loc)
+        eng.messages.add(f"{self.entity} dropped the {item}.")
 
     def remove(self, item):
         self.items.remove(item)

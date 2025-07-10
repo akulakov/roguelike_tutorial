@@ -1,3 +1,4 @@
+from itertools import compress
 import traceback
 import tcod.event
 from tcod import libtcodpy
@@ -11,8 +12,12 @@ dir_keys = dict(
     y=(-1,-1), u=(1,-1), b=(-1,1), n=(1,1),
     h=(-1,0), j=(0,1), k=(0,-1), l=(1,0))
 
+CONFIRM_KEYS = {
+   tcod.event.KeySym.RETURN,
+   tcod.event.KeySym.KP_ENTER,
+}
 
-from itertools import compress
+
 class EventHandler(tcod.event.EventDispatch):
     go = False
 
@@ -76,6 +81,11 @@ class EventHandler(tcod.event.EventDispatch):
             self.engine.event_handler = InventoryDropHandler(self.engine)
         elif key == keys.r and Shift:
             self.game_map.reveal = not self.game_map.reveal
+        elif key == keys.s:
+            for l in self.player.loc.adj():
+                e = self.game_map.get_living_at_loc(l)
+                if e and e.is_seller:
+                    self.engine.event_handler = ShopEventHandler(e, self.engine)
 
         if action:
             action.init(engine, self.player)
@@ -292,6 +302,114 @@ class InventoryEventHandler(AskUserEventHandler):
                 self.engine.messages.add(e.args[0], Color.impossible)
         return super().ev_keydown(event)
 
+class ShopEventHandler(AskUserEventHandler):
+    title = "Shop"
+    page = 0
+    maxpage = 0
+
+    def __init__(self, seller, *a, **kw):
+        self.seller = seller
+        super().__init__(*a, **kw)
+
+    def on_render(self, console):
+        super().on_render(console)
+        pl_inv = self.engine.player.inventory.items
+        shop_inv = self.seller.inventory.items
+        shop_num = len(shop_inv)
+        number_of_items_in_inventory = len(pl_inv)
+
+        height = max(shop_num, number_of_items_in_inventory) + 5
+        size = height - 4
+        self.maxpage = max(shop_num, number_of_items_in_inventory) % size + 1
+
+        if height <= 3:
+            height = 3
+
+        x,y=0,0
+
+        console.draw_frame(x=x, y=y, width=78, height=height, title=self.title, clear=True, fg=(255, 255, 255), bg=(0, 0, 0))
+
+        player = self.engine.player
+        y+=1
+        p_gold = str(player.gold)
+        console.print(x+1, y, f'${p_gold:35s} ${self.seller.gold}')
+        y+=1
+        eqp = self.engine.player.equipment
+
+        st = self.page * size
+        self.pl_inv = pl_inv[st:st+size]
+
+        i = -1
+        if number_of_items_in_inventory > 0:
+            for i, item in enumerate(self.pl_inv):
+                if not eqp.item_is_equipped(item):
+                    item_key = chr(ord('a') + i)
+                    txt = f'({item_key}) {item}'
+                    txt = (txt + ' '*30)[:30]
+                    price = int(round(item.base_price*.9))
+                    txt = txt + '{:02}'.format(price)
+                    console.print(x + 1, y + i + 1, txt)
+        else:
+            console.print(x + 1, y + 1, '(Empty)')
+
+        self.shop_inv = shop_inv[st:st+size]
+        last_ind = i+1
+        if shop_num > 0:
+            for i, item in enumerate(self.shop_inv):
+                item_key = chr(ord('a') + i + last_ind)
+                txt = f'({item_key}) {item}'
+                txt = (txt + ' '*30)[:30]
+                price = int(round(item.base_price*1.1))
+                txt = txt + '{:02}'.format(price)
+                console.print(x + 36, y + i + 1, txt)
+        else:
+            console.print(x + 36, y + 1, '(Empty)')
+
+    def ev_keydown(self, event):
+        player = self.engine.player
+        key = event.sym
+        index = key - tcod.event.KeySym.a
+        seller = self.seller
+        keys = tcod.event.KeySym
+
+        if key == keys.PAGEUP:
+            self.page = max(0, self.page-1)
+            return
+        elif key == keys.PAGEDOWN:
+            self.page = min(self.maxpage, self.page+1)
+            return
+
+        elif 0 <= index <= 26:
+            try:
+                item = (self.pl_inv + self.shop_inv)[index]
+
+                if index<len(self.pl_inv):
+                    price = int(round(item.base_price*.9))
+                    if self.seller.gold>=price:
+                        player.gold+=price
+                        seller.gold-=price
+                        player.inventory.remove(item)
+                        seller.inventory.add(item)
+                else:
+                    price = int(round(item.base_price*1.1))
+                    if self.player.gold>=price:
+                        player.gold-=price
+                        seller.gold+=price
+                        player.inventory.add(item)
+                        seller.inventory.remove(item)
+                print("player.gold", player.gold)
+                print("seller.gold", seller.gold)
+
+            except IndexError:
+                self.engine.messages.add('Invalid entry.', Color.invalid)
+                return
+            try:
+                return
+                # return self.on_item_selected(item)
+            except Impossible as e:
+                self.engine.messages.add(e.args[0], Color.impossible)
+        return super().ev_keydown(event)
+
 class InventoryActivateHandler(InventoryEventHandler):
    title = 'Select an item to use'
    def on_item_selected(self, item):
@@ -304,11 +422,6 @@ class InventoryDropHandler(InventoryEventHandler):
        a = DropItem()
        a.init(self.engine, self.engine.player, item=item)
        return a
-
-CONFIRM_KEYS = {
-   tcod.event.KeySym.RETURN,
-   tcod.event.KeySym.KP_ENTER,
-}
 
 class SelectIndexHandler(AskUserEventHandler):
     def __init__(self, engine):
