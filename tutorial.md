@@ -32,3 +32,13 @@ Tutorial: Fragment of a fallen shrine
 
     This is a good example of placing hidden_passage tile and then replacing it with a regular floor tile when
     (S)earched. Similar logic can be used for things like traps and doors and locked doors.
+
+* special entities
+
+    https://github.com/akulakov/roguelike_tutorial/blob/9d60ed8e977662720151ce67f25b35c121d4558d/entity.py#L456
+
+    Special entites (both NPCs and items) have a unique `id` and usually will be `is_hostile=False` and there will
+    probably be a handful of ways to tie them to a location, but for now the `_loc` attribute will have level and room
+    number to generate the entity.
+
+    `SpecialLocs` below gathers classes with `_loc` attribute into a data structure to make it easier to place these entities.
