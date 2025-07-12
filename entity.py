@@ -20,6 +20,7 @@ class Entity:
     entity = None
     _inventory = ()
     xp_given = 10
+    id = None
 
     def __init__(self, engine, x=None, y=None, char=None, color=None, name=None, blocking=False):
         # print("engine", engine)
@@ -85,6 +86,9 @@ class Item(Entity):
     power_bonus = 0
     defense_bonus = 0
     container = None
+
+    def activate(self):
+        pass
 
 class Living(Blocking):
     is_alive = True
@@ -452,30 +456,68 @@ class InsuperableTroll(Troll):
 from enum import Enum, auto
 class IDs(Enum):
     julius_mattius = auto()
+    note1 = auto()
+    level_a = auto()
+
+class Note(Item):
+    char = '['
+    text = None
+    color = 35,35,35
+
+class Note1(Note):
+    text = ".. my poor eyes [...] violence of sorrow froze his life's blood, and he fell ..."
+    id = IDs.note1
+    _loc = 0,2
 
 class JuliusMattius(Troll):
     color = 250, 50, 155
     is_seller = True
     name = 'Julius Mattius'
     id = IDs.julius_mattius
-    _loc = 0,1  # level 2, room 1
+    _loc = 1,1  # level 2, room 1
     is_hostile = False
     _inventory = [FireballScroll, Sword, LeatherArmor, Broom]
     gold = 500
 
+class Conversation:
+    id = None
 
-class SpecialLocs:
+class JuliusConversation(Conversation):
+    id = IDs.julius_mattius
+    condition = IDs.note1
+    text = ['Victorious gentle-Troll, I found a mysterious tattered scroll nearby, may you help me find out more as it relates to matters I may be interested in?',
+            'Traveler, it seems to be a barely legible pergament, it is surely a figment of some diseased mind of some sorry dweller of this part of the caves.',
+            '-- Julius seems worried and slightly descombobulaed. --'
+           ]
+
+class SpecialLevel:
+    id = None
+    level = None
+
+class LevelA(SpecialLevel):
+    id = IDs.level_a
+    level = 2
+    rooms = [(5,5,70,15),]
+
+class SpecialData:
     def __init__(self):
         self.data = {}
+        self.conversations = {}
+        self.levels = {}
         for obj in globals().values():
             try:
-                if issubclass(obj, Living,) and hasattr(obj,'_loc'):
+                if issubclass(obj, Entity,) and hasattr(obj,'_loc'):
                     self.data[obj._loc] = obj
+                elif issubclass(obj, Conversation) and obj.id:
+                    self.conversations[obj.id] = obj()
+                elif issubclass(obj, SpecialLevel) and obj.level:
+                    self.levels[obj.level] = obj
             except TypeError:
                 pass
 
     def get(self, k):
         return self.data.get(k)
 
-special_locs = SpecialLocs()
+special_data = SpecialData()
+# print("special_locs.data", special_data.data, special_data.conversations)
 

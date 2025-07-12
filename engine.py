@@ -8,7 +8,7 @@ from game_map import MessageLog
 from util import Loc
 from actions import Impossible
 import entity
-from procgen import generate_dungeon
+from procgen import generate_dungeon, generate_special_dungeon
 from input_handlers import EventHandler, MainMenu
 
 screen_width = 80
@@ -34,6 +34,7 @@ class Engine:
         self.tree = binarytree.Node(self.node_nums.pop())
         self.cur_node = self.tree
         self.cur_node.parent = None
+        self.specials = {}
 
     def incomplete_nodes(self, node, lst):
         """Nodes that have stairs but respective game-maps were not yet generated."""
@@ -189,7 +190,16 @@ def new_map(engine, player, up_map=None):
     room_max_size = 10
     room_min_size = 6
     max_rooms = 5
-    return generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_height, player, engine, up_map)
+    level = engine.level + 1
+    print("level", level)
+    special_level = entity.special_data.levels.get(level)
+    print("special_level", special_level)
+    if special_level and special_level.id not in engine.specials:
+        dungeon = generate_special_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_height, player, engine, up_map, special_level)
+        engine.specials[special_level.id] = dungeon
+    else:
+        dungeon = generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_height, player, engine, up_map)
+    return dungeon
 
 def load_game(filename):
     with open(filename, "rb") as f:

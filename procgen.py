@@ -101,8 +101,12 @@ class RectangularRoom:
         return y2-y1 < x2-x1
 
 def spawn(type, dungeon, engine, loc):
+    if type.id in engine.specials:
+        return
     m = type(engine, loc.x, loc.y)
     dungeon.entities.add(m)
+    if m.id:
+        engine.specials[m.id] = m
 
 E = entity
 item_chances = {
@@ -221,6 +225,27 @@ def l_line(a, b):
     return l
 
 
+def generate_special_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_height, player, engine, up_map, special_level):
+    dungeon = GameMap(map_width, map_height, {player}, up_map)
+    rooms = []
+    rnum = 1
+    for r in special_level.rooms:
+        room = RectangularRoom(*r)
+        rooms.append(room)
+        dungeon.tiles[room.inner] = tile_types.floor
+        place_entities(room, dungeon, engine)
+        rooms.append(room)
+
+        cls = entity.special_data.get((engine.level,rnum))
+        if cls:
+            place_special(room, dungeon, engine, cls)
+        rnum += 1
+    create_stairs(engine, dungeon, rooms, up_map)
+    engine.total_levels += 1
+    dungeon.rooms = rooms
+    return dungeon
+
+
 def generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_height, player, engine, up_map):
     rooms = []
     dungeon = GameMap(map_width, map_height, {player}, up_map)
@@ -326,23 +351,27 @@ def generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_hei
                 elif l in r2walls:
                     r2.entries.append(l)
 
-        for r in rooms:
-            pass
         dungeon.tiles[new_room.inner] = tile_types.floor
         place_entities(new_room, dungeon, engine)
         rooms.append(new_room)
 
-        cls = entity.special_locs.get((engine.level,rnum))
+        cls = entity.special_data.get((engine.level,rnum))
         if cls:
-            print('placing ', cls)
             place_special(new_room, dungeon, engine, cls)
         rnum += 1
 
+    create_stairs(engine, dungeon, rooms, up_map)
+    engine.total_levels += 1
+    dungeon.rooms = rooms
+    hidden_room(dungeon, rooms, map_width, map_height)
+    return dungeon
+
+def create_stairs(engine, dungeon, rooms, up_map):
     from game_map import Stairs
     locs = ()
     if engine.total_levels <= engine.max_levels:
         loc = loc2 = 0
-        if random()>.5:
+        if random()>.1:
             for _ in range(50):
                 r = choice(rooms)
                 locs = r.inner2_locs()
@@ -351,7 +380,7 @@ def generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_hei
                     if not dungeon.get_entities_at_loc(loc):
                         dungeon.tiles[loc.x, loc.y] = tile_types.down_stairs
                         break
-        if not loc or random()>.5:
+        if not loc or random()>.1:
             for _ in range(50):
                 r = choice(rooms)
                 locs = list(set(r.inner2_locs()) - {loc})
@@ -364,6 +393,7 @@ def generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_hei
         if loc and loc2:
             loc, loc2 = sorted(locs)
             dungeon.left, dungeon.right = Stairs(loc, down_dir='left'), Stairs(loc2, down_dir='right')
+            print('placing left and right stairs')
         else:
             dir = choice(('left','right'))
             setattr(dungeon, dir, Stairs(loc or loc2, down_dir=dir))
@@ -375,17 +405,10 @@ def generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_hei
             if locs2:
                 loc = choice(locs2)
                 dungeon.tiles[loc.x, loc.y] = tile_types.up_stairs
-                dungeon.up = Stairs(loc, above_loc=player.loc, game_map=up_map)
+                dungeon.up = Stairs(loc, above_loc=engine.player.loc, game_map=up_map)
                 break
         else:
             raise Exception('No tile found for up_stairs')
-
-    engine.total_levels += 1
-    dungeon.rooms = rooms
-
-    hidden_room(dungeon, rooms, map_width, map_height)
-
-    return dungeon
 
 def hidden_room_tunnel(dungeon, room):
     lst = dungeon.find_walkable(room.p1.mod(1,0), Loc(0,-1))

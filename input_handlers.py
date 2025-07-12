@@ -65,6 +65,19 @@ class EventHandler(tcod.event.EventDispatch):
 
         elif key == keys.PERIOD:
             action = WaitAction()
+
+        elif key == keys.SPACE:
+            import entity
+            for l in self.player.loc.adj():
+                e = self.game_map.get_living_at_loc(l)
+                if e:
+                    conv = entity.special_data.conversations.get(e.id)
+                    if conv and conv.condition in self.player.inventory:
+                        self.engine.event_handler = ConversationHandler(self, conv, self.engine)
+                        break
+            else:
+                engine.messages.add('So boring, no-one to talk to..')
+
         elif key == keys.v:
             self.engine.event_handler = HistoryViewer(self.engine)
         elif key == keys.m:
@@ -414,7 +427,9 @@ class InventoryActivateHandler(InventoryEventHandler):
    title = 'Select an item to use'
    def on_item_selected(self, item):
        item.activate()
-
+       import entity
+       if isinstance(item, entity.Note):
+           self.engine.event_handler = PopupMessage(self, item.text, self.engine)
 
 class InventoryDropHandler(InventoryEventHandler):
    title = 'Select an item to drop'
@@ -533,6 +548,33 @@ class MainMenu(EventHandler):
                 self.engine.event_handler = PopupMessage(self, f"Failed to load save:\n{exc}")
         elif event.sym == tcod.event.KeySym.n:
             return EventHandler(new_game()[0])
+
+class ConversationHandler(EventHandler):
+    def __init__(self, parent_handler, conversation, *a, **kw):
+        self.parent = parent_handler
+        self.conversation = conversation
+        self.i = 0
+        super().__init__(*a, **kw)
+
+    def on_render(self, console):
+        """Render the parent and dim the result, then print conversation on top."""
+        self.parent.on_render(console)
+        console.rgb["fg"] //= 4
+        console.rgb["bg"] //= 4
+
+        text = self.conversation.text[self.i]
+        from textwrap import wrap
+        lines = wrap(text, 70)
+        for n, l in enumerate(lines):
+            console.print(console.width // 2, console.height // 2 + n, l, fg=Color.white, bg=Color.black, alignment=libtcodpy.CENTER)
+
+    def ev_keydown(self, event):
+        keys = tcod.event.KeySym
+        key = event.sym
+        if key in (keys.SPACE, keys.RETURN):
+            self.i += 1
+        if self.i >= len(self.conversation.text):
+            self.engine.event_handler = EventHandler(self.engine)
 
 class PopupMessage(EventHandler):
     def __init__(self, parent_handler, text, *a, **kw):

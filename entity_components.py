@@ -200,6 +200,11 @@ class Inventory:
     def __iter__(self):
         return iter(self.items)
 
+    def __contains__(self, id):
+        for i in self.items:
+            if i.id==id:
+                return True
+
     def add(self, item):
         self.items.append(item)
         item.container = self
