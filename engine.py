@@ -10,6 +10,7 @@ from actions import Impossible
 import entity
 from procgen import generate_dungeon, generate_special_dungeon
 from input_handlers import EventHandler, MainMenu
+import libtcodpy
 
 screen_width = 80
 screen_height = 50
@@ -142,7 +143,7 @@ class Engine:
     def update_fov(self):
         """Recompute the visible area based on the players point of view."""
         loc = self.player.loc
-        self.game_map.visible[:] = compute_fov(self.game_map.tiles["transparent"], loc, radius=8)
+        self.game_map.visible[:] = compute_fov(self.game_map.tiles["transparent"], loc, radius=8, algorithm=libtcodpy.FOV_SYMMETRIC_SHADOWCAST)
         self.game_map.explored |= self.game_map.visible
 
     def render(self, console=None, context=None):
@@ -191,9 +192,7 @@ def new_map(engine, player, up_map=None):
     room_min_size = 6
     max_rooms = 5
     level = engine.level + 1
-    print("level", level)
     special_level = entity.special_data.levels.get(level)
-    print("special_level", special_level)
     if special_level and special_level.id not in engine.specials:
         dungeon = generate_special_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_height, player, engine, up_map, special_level)
         engine.specials[special_level.id] = dungeon

@@ -227,6 +227,7 @@ def l_line(a, b):
 
 def generate_special_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_height, player, engine, up_map, special_level):
     dungeon = GameMap(map_width, map_height, {player}, up_map)
+    engine.game_map = dungeon
     rooms = []
     rnum = 1
     for r in special_level.rooms:
