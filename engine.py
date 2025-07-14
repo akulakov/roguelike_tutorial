@@ -181,6 +181,7 @@ def new_game():
     player.inventory.add(entity.Sword(engine, entity=player))
     player.inventory.add(entity.LeatherArmor(engine, entity=player))
     player.inventory.add(entity.Abacus(engine, entity=player))
+    player.inventory.add(entity.SwordOfRingingBell(engine, entity=player))
     EventHandler(engine)
     engine.update_fov()
     return engine, screen_width, screen_height, tileset

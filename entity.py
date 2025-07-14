@@ -1,3 +1,4 @@
+from enum import Enum, auto
 import tcod
 from random import choice
 import input_handlers
@@ -330,6 +331,13 @@ class FireballScroll(Item):
             raise Impossible('There are no targets in the radius.')
         self.container.remove(self)
 
+class IDs(Enum):
+    julius_mattius = auto()
+    note1 = auto()
+    level_a = auto()
+    sword_ringing_bell = auto()
+    broken_sword_ringing_bell = auto()
+
 class Equippable(Item):
     def __init__(self, *a, power_bonus=0, defense_bonus=0, entity=None, **kw):
         self.entity = entity
@@ -341,7 +349,7 @@ class Equippable(Item):
         self.entity.equipment.toggle_equip(self)
 
 class Weapon(Equippable):
-    char = '/'
+    char = ')'
 class Armor(Equippable):
     char = '['
 class Tool(Equippable):
@@ -368,6 +376,24 @@ class Sword(Weapon):
     color = 0, 91, 255
     power_bonus = 4
     base_price = 25
+
+class SwordOfRingingBell(Sword):
+    name = 'Sword of Ringing Bell'
+    color = 90, 120, 155
+    id = IDs.sword_ringing_bell
+    _loc = 2,2
+
+    def break_(self):
+        self.container.remove(self)
+        item = BrokenSwordOfRingingBell(self.engine, self.container.entity)
+        self.container.add(item)
+        self.engine.messages.add(f'You break the {self}')
+
+class BrokenSwordOfRingingBell(Item):
+    char = ']'
+    name = 'Pieces of broken sword of ringing bell'
+    color = 90, 120, 155
+    id = IDs.broken_sword_ringing_bell
 
 class LeatherArmor(Armor):
     color = 0, 1, 255
@@ -452,12 +478,6 @@ class InsuperableTroll(Troll):
     name = 'Insuperable Troll'
     fighter = 37,14,15
     xp_given = 160
-
-from enum import Enum, auto
-class IDs(Enum):
-    julius_mattius = auto()
-    note1 = auto()
-    level_a = auto()
 
 class Note(Item):
     char = '['

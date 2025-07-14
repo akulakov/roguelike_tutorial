@@ -46,6 +46,7 @@ class EventHandler(tcod.event.EventDispatch):
                 action = BumpAction(mod)
         self.go = False
         Shift = event.mod & tcod.event.Modifier.SHIFT
+        # print("key", key)
         if key == keys.g:
             self.go = True
         elif key == keys.PERIOD and Shift:
@@ -80,6 +81,8 @@ class EventHandler(tcod.event.EventDispatch):
 
         elif key == keys.v:
             self.engine.event_handler = HistoryViewer(self.engine)
+        elif key == keys.N3 and Shift:
+            self.engine.event_handler = HashCommandHandler(self.engine)
         elif key == keys.m:
             self.engine.event_handler = MapViewer(self.engine)
         elif key == keys.c:
@@ -229,6 +232,28 @@ class HistoryViewer(EventHandler):
             self.engine.event_handler = EventHandler(self.engine)
 
 
+class HashCommandHandler(EventHandler):
+    def __init__(self, *a, **kw):
+        self.cmd = ''
+        super().__init__(*a, **kw)
+
+    def on_render(self, console):
+        console.print(2, 35, '# ' + self.cmd)
+        super().on_render(console)
+
+    def ev_keydown(self, event):
+        keys = tcod.event.KeySym
+        key = event.sym
+        # import pdb;pdb.set_trace()
+        if key==keys.RETURN:
+            if self.cmd == 'break':
+                self.engine.event_handler = InventoryBreakHandler(self.engine)
+            else:
+                self.engine.messages.add('Unknown command')
+                self.engine.event_handler = EventHandler(self.engine)
+        else:
+            self.cmd += chr(key.value)
+
 class AskUserEventHandler(EventHandler):
     def handle_action(self, action):
         """Return to the main event handler when a valid action was performed."""
@@ -236,7 +261,7 @@ class AskUserEventHandler(EventHandler):
             self.engine.event_handler = EventHandler(self.engine)
             return True
         return False
- 
+
     def ev_keydown(self, event):
         """By default any key exits this input handler."""
         if event.sym in {
@@ -249,7 +274,7 @@ class AskUserEventHandler(EventHandler):
         }:
             return None
         return self.on_exit()
- 
+
     def ev_mousebuttondown(self, event):
         """By default any mouse click exits this input handler."""
         return self.on_exit()
@@ -425,11 +450,21 @@ class ShopEventHandler(AskUserEventHandler):
 
 class InventoryActivateHandler(InventoryEventHandler):
    title = 'Select an item to use'
+   action = 'activate'
+
    def on_item_selected(self, item):
-       item.activate()
+       m = getattr(item, self.action, None)
+       if not m:
+           self.engine.messages.add('This action cannot be used on this item')
+       else:
+           m()
        import entity
        if isinstance(item, entity.Note):
            self.engine.event_handler = PopupMessage(self, item.text, self.engine)
+
+class InventoryBreakHandler(InventoryActivateHandler):
+    title = 'Select an item to break'
+    action = 'break_'
 
 class InventoryDropHandler(InventoryEventHandler):
    title = 'Select an item to drop'
