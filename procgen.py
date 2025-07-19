@@ -107,8 +107,19 @@ def spawn(type, dungeon, engine, loc):
     dungeon.entities.add(m)
     if m.id:
         engine.specials[m.id] = m
+
+    if isinstance(m, entity.Living):
+        items = get_entities_at_random(item_chances, randint(0,2), engine.level)
+        for i in items:
+            m.inventory.add(i(engine))
+        m.inventory.add(entity.LightningScroll(engine))
+
+    # spawn a box with contents
     if isinstance(m, entity.Box):
-        pass
+        items = get_entities_at_random(item_chances, randint(0,2), engine.level)
+        for i in items:
+            if i!=entity.Box:
+                m.inventory.add(i(engine))
 
 E = entity
 item_chances = {
@@ -133,7 +144,7 @@ enemy_chances = {
    14: [(E.InsuperableTroll, 40)],
 }
 
-def get_entities_at_random( weighted_chances_by_floor, number_of_entities, floor):
+def get_entities_at_random(weighted_chances_by_floor, number_of_entities, floor):
     entity_weighted_chances = {}
 
     for key, values in weighted_chances_by_floor.items():
@@ -147,7 +158,7 @@ def get_entities_at_random( weighted_chances_by_floor, number_of_entities, floor
 
     entities = list(entity_weighted_chances.keys())
     entity_weighted_chance_values = list(entity_weighted_chances.values())
-    return choices( entities, weights=entity_weighted_chance_values, k=number_of_entities)
+    return choices(entities, weights=entity_weighted_chance_values, k=number_of_entities)
 
 def place_entities(room, dungeon, engine):
     monsters = get_entities_at_random(enemy_chances, randint(0,2), engine.level)
@@ -162,6 +173,7 @@ def place_special(room, dungeon, engine, cls):
     for _ in range(50):
         loc = Loc( randint(room.x1 + 1, room.x2 - 1), randint(room.y1 + 1, room.y2 - 1) )
         if not any(loc==entity.loc for entity in dungeon.entities):
+            print("special cls", cls, loc)
             spawn(cls, dungeon, engine, loc)
             return
 

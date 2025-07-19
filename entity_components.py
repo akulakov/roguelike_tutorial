@@ -183,6 +183,11 @@ class Fighter:
         e.is_hostile = False
         e.name = f'remains of {self.entity.name}'
         e.render_order = 1
+        print("e.inventory", e.inventory.items)
+        for i in e.inventory:
+            i.loc = e.loc
+            eng.game_map.entities.add(i)
+            e.inventory.items = []
 
 
 class Inventory:
@@ -218,3 +223,7 @@ class Inventory:
     def remove(self, item):
         self.items.remove(item)
 
+    def get(self, cls):
+        ls = [i for i in self if isinstance(i, cls)]
+        if ls:
+            return ls[0]

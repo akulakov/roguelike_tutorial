@@ -105,6 +105,9 @@ class Living(Blocking):
         super().__init__(*a, **kw)
         self.level = CharLevel(self.engine, self, xp_given=self.xp_given)
 
+    def hostile_to(self, other):
+        return (self.is_hostile and other.is_player) or (self.is_player and other.is_hostile)
+
 class Hostile(Living):
     is_hostile = True
     path = None
@@ -143,6 +146,12 @@ class Hostile(Living):
             if not self.confused:
                 self.engine.messages.add(f"The {self} is no longer confused.")
             return a
+
+        ls = self.inventory.get(LightningScroll)
+        if ls:
+            if ls.is_usable(self.engine.player):
+                ls.activate()
+                return
 
         if self.game_map.visible[self.loc.x, self.loc.y]:
             if self.loc.dist(target.loc) <= 1:
@@ -207,18 +216,27 @@ class LightningScroll(Item):
     maximum_range = 5
     base_price = 20
 
-    def activate(self):
+    def is_usable(self, target):
+        """Determine if can be used by monsters / NPCs."""
+        return target == self.calculate_target()
+
+    def calculate_target(self):
         target = None
         closest_distance = self.maximum_range + 1.0
         e = self.container.entity
 
         for being in self.engine.game_map.living():
-            l = being.loc
-            if being is not e and e.game_map.visible[l.x, l.y]:
-                distance = e.loc.dist(l)
-                if distance < closest_distance:
-                    target = being
-                    closest_distance = distance
+            if e.hostile_to(being):
+                l = being.loc
+                if being is not e and e.game_map.visible[l.x, l.y]:
+                    distance = e.loc.dist(l)
+                    if distance < closest_distance:
+                        target = being
+                        closest_distance = distance
+        return target
+
+    def activate(self):
+        target = self.calculate_target()
 
         if target:
             self.engine.messages.add(f'A lighting bolt strikes the {target.name} with a loud thunder, for {self.damage} damage!')
@@ -392,7 +410,7 @@ class SwordOfRingingBell(Sword):
     name = 'Sword of Ringing Bell'
     color = 90, 120, 155
     id = IDs.sword_ringing_bell
-    _loc = 2,2
+    _loc = 2,1
 
     def break_(self):
         self.container.remove(self)
