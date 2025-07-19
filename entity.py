@@ -8,6 +8,8 @@ from actions import WaitAction, MovementAction, MeleeAction, Impossible, BumpAct
 from game_map import Color
 from entity_components import Equipment, CharLevel, Inventory, Fighter
 
+YES_NO = 1
+
 class Entity:
     is_hostile = False
     game_map = None
@@ -337,6 +339,7 @@ class IDs(Enum):
     level_a = auto()
     sword_ringing_bell = auto()
     broken_sword_ringing_bell = auto()
+    martinella = auto()
 
 class Equippable(Item):
     def __init__(self, *a, power_bonus=0, defense_bonus=0, entity=None, **kw):
@@ -354,6 +357,14 @@ class Armor(Equippable):
     char = '['
 class Tool(Equippable):
     char = ']'
+
+class Box(Item):
+    char = ']'
+    color = 100,100,100
+
+    def __init__(self, engine, *a, **kw):
+        self.inventory = Inventory(engine, self, 20)
+        super().__init__(engine, *a, **kw)
 
 class Broom(Tool):
     color = 0, 95, 225
@@ -499,8 +510,93 @@ class JuliusMattius(Troll):
     _inventory = [FireballScroll, Sword, LeatherArmor, Broom]
     gold = 500
 
+class Martinella(Orc):
+    color = 25, 25, 205
+    name = 'Martinella'
+    id = IDs.martinella
+    _loc = 0,1
+    _inventory = [BurlyArmor]
+    gold = 100
+    is_hostile = False
+
 class Conversation:
     id = None
+
+class Quest:
+    id = None
+    step = 1
+    started = False
+    completed = False
+    end_condition = None
+
+    def __init__(self, engine, entity):
+        self.engine = engine
+        self.entity = entity
+
+    def condition(self):
+        return True
+
+    @property
+    def conv(self):
+        if self.step==1:
+            return self.initial
+        elif self.step==3:
+            return self.end_text
+
+    def start(self):
+        self.step = 2
+        self.started = True
+
+    def check_end_condition(self):
+        return self.end_condition in self.engine.player.inventory
+
+    def end(self):
+        self.step = 3
+        self.completed = True
+        player = self.engine.player
+        if self.reward:
+            for i in self.reward:
+                if isinstance(i, int):
+                    player.gold += i
+                    self.engine.messages.add(f'You receive ${i}')
+                else:
+                    item = i(self.engine, entity=player)
+                    player.inventory.add(item)
+                    self.engine.messages.add(f'You receive {item}!')
+
+    def advance(self):
+        if not self.started:
+            return
+        if self.step==1:
+            self.start()
+        if self.step==2 and self.check_end_condition():
+            self.end()
+
+class ConversationMessage:
+    pass
+
+class YesNoMessage(ConversationMessage):
+    def __init__(self, text=None):
+        text = text or 'Will you help?'
+        self.text = text + ' [Y/N]'
+
+
+class MartinellaQuest(Quest):
+    name = 'Martinella Quest'
+    id = IDs.martinella
+    initial = [
+        'Whether by skill or ingenuity, the ringing sword shall be demolished if this part of the caves is to enjoy its rightful peace.',
+        'You will have your reward.',
+        'I spoke.',
+        'Martinella humphps and crosses his arms.',
+        YesNoMessage(),
+    ]
+    end_condition = IDs.broken_sword_ringing_bell
+    end_text = [
+        'Beauty of the blade so illustrious.. that part of me wishes I could have kept it too myself.',
+        'Yet it was wise on my part to have it broken..',
+    ]
+    reward = (100, BurlyArmor)
 
 class JuliusConversation(Conversation):
     id = IDs.julius_mattius
@@ -520,10 +616,12 @@ class LevelA(SpecialLevel):
     rooms = [(5,5,70,15),]
 
 class SpecialData:
+    """Special NPCs, items, conversations, levels, quests."""
     def __init__(self):
         self.data = {}
         self.conversations = {}
         self.levels = {}
+        self.quests = {}
         for obj in globals().values():
             try:
                 if issubclass(obj, Entity,) and hasattr(obj,'_loc'):
@@ -532,6 +630,8 @@ class SpecialData:
                     self.conversations[obj.id] = obj()
                 elif issubclass(obj, SpecialLevel) and obj.level:
                     self.levels[obj.level] = obj
+                elif issubclass(obj, Quest) and obj.id:
+                    self.quests[obj.id] = obj
             except TypeError:
                 pass
 

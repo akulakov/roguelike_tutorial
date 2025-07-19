@@ -107,10 +107,12 @@ def spawn(type, dungeon, engine, loc):
     dungeon.entities.add(m)
     if m.id:
         engine.specials[m.id] = m
+    if isinstance(m, entity.Box):
+        pass
 
 E = entity
 item_chances = {
-   0: [(E.HealthPotion, 35), (E.ChainMail, 25)],
+   0: [(E.HealthPotion, 35), (E.ChainMail, 25), (E.Box, 35)],
    2: [(E.ConfusionScroll, 10)],
    4: [(E.LightningScroll, 25), (E.Sword, 5)],
    6: [(E.FireballScroll, 25), (E.ChainMail, 15)],

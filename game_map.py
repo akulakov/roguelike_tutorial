@@ -111,9 +111,17 @@ class GameMap:
     def living(self):
         yield from (e for e in self.entities if e.is_alive)
 
-    def items(self):
+    def items(self, filter=object):
         from entity import Item
-        yield from (e for e in self.entities if isinstance(e, Item))
+        yield from (e for e in self.entities if isinstance(e, Item) and isinstance(e, filter))
+
+    def item(self, loc, filter=object):
+        it = self.items(filter)
+        # for i in it:
+            # print("i.loc", i.loc)
+        l = [i for i in it if i.loc==loc]
+        if l:
+            return l[0]
 
     def in_bounds(self, loc):
         """Return True if x and y are inside of the bounds of this map."""

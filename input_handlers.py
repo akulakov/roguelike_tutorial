@@ -1,3 +1,4 @@
+from textwrap import wrap
 from itertools import compress
 import traceback
 import tcod.event
@@ -46,6 +47,7 @@ class EventHandler(tcod.event.EventDispatch):
                 action = BumpAction(mod)
         self.go = False
         Shift = event.mod & tcod.event.Modifier.SHIFT
+        import entity
         # print("key", key)
         if key == keys.g:
             self.go = True
@@ -68,13 +70,26 @@ class EventHandler(tcod.event.EventDispatch):
             action = WaitAction()
 
         elif key == keys.SPACE:
-            import entity
             for l in self.player.loc.adj():
                 e = self.game_map.get_living_at_loc(l)
                 if e:
                     conv = entity.special_data.conversations.get(e.id)
+                    quest = engine.quests.get(e.id)
+                    if not quest:
+                        Q = entity.special_data.quests.get(e.id)
+                        if Q:
+                            quest = Q(engine, e)
+                    if quest:
+                        engine.quests[e.id] = quest
                     if conv and conv.condition in self.player.inventory:
                         self.engine.event_handler = ConversationHandler(self, conv, self.engine)
+                        break
+                    elif quest and quest.condition() and not quest.completed:
+                        quest.advance()
+                        if quest.conv:
+                            self.engine.event_handler = ConversationHandler(self, quest.conv, self.engine, on_yes=quest.start)
+                        else:
+                            engine.messages.add(f'{quest.entity} ignores you')
                         break
             else:
                 engine.messages.add('So boring, no-one to talk to..')
@@ -89,12 +104,20 @@ class EventHandler(tcod.event.EventDispatch):
             self.engine.event_handler = CharacterScreenEventHandler(self.engine)
         elif key == keys.i:
             self.engine.event_handler = InventoryActivateHandler(self.engine)
+
+        elif key == keys.o:
+            box = self.game_map.item(self.player.loc, entity.Box)
+            if box:
+                self.engine.event_handler = BoxHandler(box, self.engine)
+
         elif key == keys.SLASH:
             self.engine.event_handler = LookHandler(self.engine)
         elif key == keys.COMMA:
             action = PickupAction()
         elif key == keys.d:
             self.engine.event_handler = InventoryDropHandler(self.engine)
+        elif key == keys.q and Shift:
+            self.engine.event_handler = QuestsHandler(self.engine)
         elif key == keys.r and Shift:
             self.game_map.reveal = not self.game_map.reveal
         elif key == keys.s:
@@ -340,25 +363,27 @@ class InventoryEventHandler(AskUserEventHandler):
                 self.engine.messages.add(e.args[0], Color.impossible)
         return super().ev_keydown(event)
 
-class ShopEventHandler(AskUserEventHandler):
-    title = "Shop"
+class TransferBetweenInventoriesHandler(AskUserEventHandler):
     page = 0
     maxpage = 0
 
-    def __init__(self, seller, *a, **kw):
-        self.seller = seller
+    def __init__(self, other, *a, **kw):
+        """
+        other: shop seller, container, etc
+        """
+        self.other = other
         super().__init__(*a, **kw)
 
     def on_render(self, console):
         super().on_render(console)
         pl_inv = self.engine.player.inventory.items
-        shop_inv = self.seller.inventory.items
-        shop_num = len(shop_inv)
+        other_inv = self.other.inventory.items
+        other_num = len(other_inv)
         number_of_items_in_inventory = len(pl_inv)
 
-        height = max(shop_num, number_of_items_in_inventory) + 5
+        height = max(other_num, number_of_items_in_inventory) + 5
         size = height - 4
-        self.maxpage = max(shop_num, number_of_items_in_inventory) % size + 1
+        self.maxpage = max(other_num, number_of_items_in_inventory) % size + 1
 
         if height <= 3:
             height = 3
@@ -370,7 +395,8 @@ class ShopEventHandler(AskUserEventHandler):
         player = self.engine.player
         y+=1
         p_gold = str(player.gold)
-        console.print(x+1, y, f'${p_gold:35s} ${self.seller.gold}')
+        if self.is_shop:
+            console.print(x+1, y, f'${p_gold:35s} ${self.other.gold}')
         y+=1
         eqp = self.engine.player.equipment
 
@@ -384,21 +410,23 @@ class ShopEventHandler(AskUserEventHandler):
                     item_key = chr(ord('a') + i)
                     txt = f'({item_key}) {item}'
                     txt = (txt + ' '*30)[:30]
-                    price = int(round(item.base_price*.9))
-                    txt = txt + '{:02}'.format(price)
+                    if self.is_shop:
+                        price = int(round(item.base_price*.9))
+                        txt = txt + '{:02}'.format(price)
                     console.print(x + 1, y + i + 1, txt)
         else:
             console.print(x + 1, y + 1, '(Empty)')
 
-        self.shop_inv = shop_inv[st:st+size]
+        self.other_inv = other_inv[st:st+size]
         last_ind = i+1
-        if shop_num > 0:
-            for i, item in enumerate(self.shop_inv):
+        if other_num > 0:
+            for i, item in enumerate(self.other_inv):
                 item_key = chr(ord('a') + i + last_ind)
                 txt = f'({item_key}) {item}'
                 txt = (txt + ' '*30)[:30]
-                price = int(round(item.base_price*1.1))
-                txt = txt + '{:02}'.format(price)
+                if self.is_shop:
+                    price = int(round(item.base_price*1.1))
+                    txt = txt + '{:02}'.format(price)
                 console.print(x + 36, y + i + 1, txt)
         else:
             console.print(x + 36, y + 1, '(Empty)')
@@ -407,8 +435,17 @@ class ShopEventHandler(AskUserEventHandler):
         player = self.engine.player
         key = event.sym
         index = key - tcod.event.KeySym.a
-        seller = self.seller
+        other = self.other
         keys = tcod.event.KeySym
+
+        def check_gold(entity, price):
+            gold = getattr(entity, 'gold', 0)
+            return not self.is_shop or gold>=price
+
+        def money_transfer(from_, to, amt):
+            if self.is_shop:
+                from_.gold -= amt
+                to.gold += amt
 
         if key == keys.PAGEUP:
             self.page = max(0, self.page-1)
@@ -419,24 +456,20 @@ class ShopEventHandler(AskUserEventHandler):
 
         elif 0 <= index <= 26:
             try:
-                item = (self.pl_inv + self.shop_inv)[index]
+                item = (self.pl_inv + self.other_inv)[index]
 
                 if index<len(self.pl_inv):
                     price = int(round(item.base_price*.9))
-                    if self.seller.gold>=price:
-                        player.gold+=price
-                        seller.gold-=price
+                    if check_gold(self.other, price):
                         player.inventory.remove(item)
-                        seller.inventory.add(item)
+                        other.inventory.add(item)
+                        money_transfer(other, player, price)
                 else:
                     price = int(round(item.base_price*1.1))
-                    if self.player.gold>=price:
-                        player.gold-=price
-                        seller.gold+=price
+                    if check_gold(self.player, price):
                         player.inventory.add(item)
-                        seller.inventory.remove(item)
-                print("player.gold", player.gold)
-                print("seller.gold", seller.gold)
+                        other.inventory.remove(item)
+                        money_transfer(player, other, price)
 
             except IndexError:
                 self.engine.messages.add('Invalid entry.', Color.invalid)
@@ -447,6 +480,14 @@ class ShopEventHandler(AskUserEventHandler):
             except Impossible as e:
                 self.engine.messages.add(e.args[0], Color.impossible)
         return super().ev_keydown(event)
+
+class ShopEventHandler(TransferBetweenInventoriesHandler):
+    title = 'Shop'
+    is_shop = True
+
+class BoxHandler(TransferBetweenInventoriesHandler):
+    title = 'Box'
+    is_shop = False
 
 class InventoryActivateHandler(InventoryEventHandler):
    title = 'Select an item to use'
@@ -585,8 +626,12 @@ class MainMenu(EventHandler):
             return EventHandler(new_game()[0])
 
 class ConversationHandler(EventHandler):
-    def __init__(self, parent_handler, conversation, *a, **kw):
+    def __init__(self, parent_handler, conversation, *a, on_yes=None, **kw):
         self.parent = parent_handler
+        self.on_yes = on_yes
+        # handle either conversation object or a list of text
+        if conversation and not isinstance(conversation, list):
+            conversation = conversation.text
         self.conversation = conversation
         self.i = 0
         super().__init__(*a, **kw)
@@ -597,23 +642,29 @@ class ConversationHandler(EventHandler):
         console.rgb["fg"] //= 4
         console.rgb["bg"] //= 4
 
-        text = self.conversation.text[self.i]
-        from textwrap import wrap
-        lines = wrap(text, 70)
-        for n, l in enumerate(lines):
-            console.print(console.width // 2, console.height // 2 + n, l, fg=Color.white, bg=Color.black, alignment=libtcodpy.CENTER)
+        text = self.conversation[self.i]
+        import entity
+        if self.on_yes and isinstance(text, entity.YesNoMessage):
+            self.engine.event_handler = PopupMessage(self, text.text, self.engine, yes_no=True, on_yes=self.on_yes)
+        else:
+            lines = wrap(text, 70)
+            for n, l in enumerate(lines):
+                console.print(console.width // 2, console.height // 2 + n, l, fg=Color.white, bg=Color.black, alignment=libtcodpy.CENTER)
 
     def ev_keydown(self, event):
         keys = tcod.event.KeySym
         key = event.sym
         if key in (keys.SPACE, keys.RETURN):
             self.i += 1
-        if self.i >= len(self.conversation.text):
+        conv = self.conversation
+        if self.i >= len(conv):
             self.engine.event_handler = EventHandler(self.engine)
 
 class PopupMessage(EventHandler):
-    def __init__(self, parent_handler, text, *a, **kw):
+    def __init__(self, parent_handler, text, *a, yes_no=None, on_yes=None, **kw):
         self.parent = parent_handler
+        self.yes_no = yes_no
+        self.on_yes = on_yes
         self.text = text
         super().__init__(*a, **kw)
 
@@ -623,11 +674,15 @@ class PopupMessage(EventHandler):
         console.rgb["fg"] //= 8
         console.rgb["bg"] //= 8
 
-        console.print(console.width // 2, console.height // 2, self.text, fg=Color.white,
-            bg=Color.black, alignment=libtcodpy.CENTER)
+        console.print(console.width // 2, console.height // 2, self.text, fg=Color.white, bg=Color.black, alignment=libtcodpy.CENTER)
 
     def ev_keydown(self, event):
-        self.engine.event_handler = EventHandler(self.engine)
+        keys = tcod.event.KeySym
+        if self.yes_no and event.sym==keys.y:
+            if self.on_yes:
+                self.on_yes()
+        if not self.yes_no or event.sym in (keys.y, keys.n, keys.ESCAPE):
+            self.engine.event_handler = EventHandler(self.engine)
 
 class LevelUpEventHandler(AskUserEventHandler):
     title = "Level Up"
@@ -688,3 +743,20 @@ class CharacterScreenEventHandler(AskUserEventHandler):
         console.print( x=x + 1, y=y + 3, string=f"XP for next Level: {p.level.experience_to_next_level}")
         console.print( x=x + 1, y=y + 4, string=f"Attack: {p.fighter._power}")
         console.print( x=x + 1, y=y + 5, string=f"Defense: {p.fighter._defense}")
+
+class QuestsHandler(AskUserEventHandler):
+    title = 'Quests'
+
+    def on_render(self, console):
+        super().on_render(console)
+        if self.engine.player.loc.x <= 30:
+            x = 40
+        else:
+            x = 0
+        y = 0
+        width = 40
+        console.draw_frame(x=x, y=y, width=width, height=7, title=self.title, clear=True, fg=(255, 255, 255), bg=(0, 0, 0),)
+        for q in self.engine.quests.values():
+            c = ' [completed]' if q.completed else ''
+            n = (q.name+' '*25)[:25]
+            console.print(x=x + 1, y=y + 1, string=f'{n}' + c)

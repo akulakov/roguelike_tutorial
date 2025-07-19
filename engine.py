@@ -36,6 +36,7 @@ class Engine:
         self.cur_node = self.tree
         self.cur_node.parent = None
         self.specials = {}
+        self.quests = {}
 
     def incomplete_nodes(self, node, lst):
         """Nodes that have stairs but respective game-maps were not yet generated."""
