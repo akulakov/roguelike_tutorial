@@ -42,3 +42,26 @@ Tutorial: Fragment of a fallen shrine
     number to generate the entity.
 
     * `SpecialLocs` below gathers classes with `_loc` attribute into a data structure to make it easier to place these entities.
+
+* Containers (e.g. boxes)
+
+    * 'o' command opens a container
+    * on the left side, player inventory is shown, on the right side - container inventory. Items can be transferred by
+        selecting them. PageUp / PageDown used to scroll.
+    * the handler logic is the same as buying items from a shop, except that no prices are shown and player gold / box
+        gold are not updated when items are transferred. From development POV it would have been easier to first
+        implement the Box logic and then enhance it to support shopping from a seller, but instead I did it in reverse
+        order, which also meant a lot of variable names had to be updated to be more generalized.
+    * equipped items are not shown in the list.
+
+    * https://github.com/akulakov/roguelike_tutorial/blob/0203d5dc5ab902628ed07a5d27035d7740c55d49/input_handlers.py#L366
+
+        * in on_render, a few variables are initialized and the player items are printed on the left side, then
+        container items are printed on the left, note the `i` variable is kept after the first loop to continue item
+        keys sequentially (e.g. if player items are a,b,c -- container items continue as d,e,f,...).
+
+        * on `ev_keydown`, we first handle PAGEDOWN, PAGEUP, then we get the item by index, and remove from originating
+        inventory and add to target inventory.
+
+        * This may be confusing: even for the container, we run `check_gold` validator, but it will always return True
+        for containers. Similarly `money_transfer` does not perform any action for containers.
