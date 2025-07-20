@@ -113,7 +113,14 @@ class EventHandler(tcod.event.EventDispatch):
         elif key == keys.SLASH:
             self.engine.event_handler = LookHandler(self.engine)
         elif key == keys.COMMA:
-            action = PickupAction()
+            l = engine.game_map.get_entities_at_loc(self.engine.player.loc)
+            l = [i for i in l if isinstance(i, entity.Item)]
+            if not l:
+                engine.messages.add('Nothing to pick up..')
+            elif len(l)==1:
+                action = PickupAction()
+            else:
+                self.engine.event_handler = PickupEventHandler(self.engine)
         elif key == keys.d:
             self.engine.event_handler = InventoryDropHandler(self.engine)
         elif key == keys.q and Shift:
@@ -307,12 +314,15 @@ class AskUserEventHandler(EventHandler):
 
 class InventoryEventHandler(AskUserEventHandler):
     title = "Inventory"
+    is_inventory = True
+
+    def get_items(self):
+        return self.engine.player.inventory.items
 
     def on_render(self, console):
         super().on_render(console)
-        number_of_items_in_inventory = len(self.engine.player.inventory.items)
-
-        height = number_of_items_in_inventory + 2
+        num_items = len(self.get_items())
+        height = num_items + 2
 
         if height <= 3:
             height = 3
@@ -323,37 +333,27 @@ class InventoryEventHandler(AskUserEventHandler):
             x = 0
 
         y = 0
-
         width = len(self.title) + 25
+        console.draw_frame(x=x, y=y, width=width, height=height, title=self.title, clear=True, fg=(255, 255, 255), bg=(0, 0, 0))
 
-        console.draw_frame(
-            x=x,
-            y=y,
-            width=width,
-            height=height,
-            title=self.title,
-            clear=True,
-            fg=(255, 255, 255),
-            bg=(0, 0, 0),
-        )
-
-        if number_of_items_in_inventory > 0:
-            for i, item in enumerate(self.engine.player.inventory.items):
+        if num_items > 0:
+            for i, item in enumerate(self.get_items()):
                 item_key = chr(ord('a') + i)
-                is_equipped = self.engine.player.equipment.item_is_equipped(item)
-                is_equipped = ' (E)' if is_equipped else ''
+                is_equipped = ''
+                if self.is_inventory:
+                    is_equipped = self.engine.player.equipment.item_is_equipped(item)
+                    is_equipped = ' (E)' if is_equipped else ''
                 console.print(x + 1, y + i + 1, f'({item_key}) {item}{is_equipped}')
         else:
             console.print(x + 1, y + 1, '(Empty)')
 
     def ev_keydown(self, event):
-        player = self.engine.player
         key = event.sym
         index = key - tcod.event.KeySym.a
 
         if 0 <= index <= 26:
             try:
-                selected_item = player.inventory.items[index]
+                selected_item = self.get_items()[index]
             except IndexError:
                 self.engine.messages.add('Invalid entry.', Color.invalid)
                 return
@@ -362,6 +362,19 @@ class InventoryEventHandler(AskUserEventHandler):
             except Impossible as e:
                 self.engine.messages.add(e.args[0], Color.impossible)
         return super().ev_keydown(event)
+
+class PickupEventHandler(InventoryEventHandler):
+    title = 'Ground'
+    is_inventory = False
+
+    def get_items(self):
+        l = self.engine.game_map.get_entities_at_loc(self.engine.player.loc)
+        import entity
+        return [i for i in l if isinstance(i, entity.Item)]
+
+    def on_item_selected(self, item):
+        self.engine.player.inventory.add(item)
+        self.engine.game_map.items.remove(item)
 
 class TransferBetweenInventoriesHandler(AskUserEventHandler):
     page = 0
