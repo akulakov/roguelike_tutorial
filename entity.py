@@ -1,6 +1,6 @@
 from enum import Enum, auto
 import tcod
-from random import choice
+from random import choice, random
 import input_handlers
 import numpy as np
 from util import Loc
@@ -31,8 +31,8 @@ class Entity:
             import pdb;pdb.set_trace()
         if x is not None:
             self.loc = Loc(x, y)
-        self.char = self.char or char
-        self.blocking = self.blocking or blocking
+        self._char = self.char or char
+        self._blocking = self.blocking or blocking
         self.color = self.color or color
         self.name = self.name or name or self.__class__.__name__
         self.engine = engine
@@ -208,6 +208,20 @@ class HealthPotion(HealingItem):
     amount = 4
     base_price = 10
 
+class AuspiciousRoomScroll(Item):
+    char = '~'
+    color = 147,45,155
+    name = 'Auspicious Room Scroll'
+    base_price = 30
+
+    def activate(self):
+        r = choice(self.engine.game_map.rooms)
+        r.auspicious = 30
+        self.container.remove(self)
+        self.engine.messages.add('You feel like there is a good place for you somewhere on this level of caves')
+        print("r auspicious", r, r.auspicious)
+
+
 class LightningScroll(Item):
     char = '~'
     color = 127,25,155
@@ -379,9 +393,11 @@ class Tool(Equippable):
 class Box(Item):
     char = ']'
     color = 100,100,100
+    locked = False
 
     def __init__(self, engine, *a, **kw):
         self.inventory = Inventory(engine, self, 20)
+        self.locked = random()>.05
         super().__init__(engine, *a, **kw)
 
 class Broom(Tool):
@@ -480,6 +496,7 @@ class ResoluteOrc(Orc):
 
 class KnurledGoblin(Hostile):
     """The hide of these Goblins is thick and knurled, increasing their doughtiness to rarely seen level."""
+    char = 'g'
     color = 65,65,95
     name = 'Knurled Goblin'
     fighter = 30,9,9
@@ -655,6 +672,30 @@ class SpecialData:
 
     def get(self, k):
         return self.data.get(k)
+
+class Door(Entity):
+    closed = True
+    color = 205, 25, 205
+
+    def __init__(self, *a, **kw):
+        self.locked = random()>.95
+        super().__init__(*a, **kw)
+
+    @property
+    def char(self):
+        return '+' if self.closed else ''
+
+    @property
+    def blocking(self):
+        return self.closed
+
+    def toggle(self):
+        if not self.locked:
+            self.closed = not self.closed
+
+class Key(Tool):
+    color = 205, 100, 205
+
 
 special_data = SpecialData()
 # print("special_locs.data", special_data.data, special_data.conversations)

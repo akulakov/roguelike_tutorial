@@ -18,6 +18,8 @@ max_monsters_by_floor = [
 ]
 
 class RectangularRoom:
+    auspicious = 0
+
     def __init__(self, x, y, width, height):
         self.x1 = x
         self.y1 = y
@@ -43,6 +45,9 @@ class RectangularRoom:
 
     def inner2(self):
         return Loc(self.x1+2, self.y1+2), Loc(self.x2-2, self.y2-2)
+
+    def __contains__(self, loc):
+        return self.x1 <= loc.x <= self.x2 and self.y1 <= loc.y <= self.y2
 
     def walls(self):
         l = []
@@ -355,6 +360,14 @@ def generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_hei
             if set(tun) & tun_locs:
                 continue
 
+            if random()>.5:
+                for x,y in tun:
+                    if x in (r1.x1, r1.x2, r2.x1, r2.x2) or y in (r1.y1,r1.y2,r2.y1,r2.y2):
+                        d = entity.Door(engine, x, y)
+                        if random()>.8:
+                            d.locked = True
+                        dungeon.entities.add(d)
+                        break
             for x,y in tun:
                 dungeon.tiles[x,y] = tile_types.floor
                 tun_locs.add((x,y))

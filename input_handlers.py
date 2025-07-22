@@ -1,3 +1,4 @@
+from random import random, randint
 from textwrap import wrap
 from itertools import compress
 import traceback
@@ -69,6 +70,7 @@ class EventHandler(tcod.event.EventDispatch):
         elif key == keys.PERIOD:
             action = WaitAction()
 
+        # TALK
         elif key == keys.SPACE:
             for l in self.player.loc.adj():
                 e = self.game_map.get_living_at_loc(l)
@@ -96,8 +98,10 @@ class EventHandler(tcod.event.EventDispatch):
 
         elif key == keys.v:
             self.engine.event_handler = HistoryViewer(self.engine)
+
         elif key == keys.N3 and Shift:
             self.engine.event_handler = HashCommandHandler(self.engine)
+
         elif key == keys.m:
             self.engine.event_handler = MapViewer(self.engine)
         elif key == keys.c:
@@ -105,10 +109,38 @@ class EventHandler(tcod.event.EventDispatch):
         elif key == keys.i:
             self.engine.event_handler = InventoryActivateHandler(self.engine)
 
+        # OPEN DOORS / BOXES
         elif key == keys.o:
             box = self.game_map.item(self.player.loc, entity.Box)
             if box:
-                self.engine.event_handler = BoxHandler(box, self.engine)
+                ok = False
+                if box.locked:
+                    k = self.player.inventory.get(entity.Key)
+                    if k:
+                        box.locked = False
+                        self.player.inventory.remove(k)
+                        ok = True
+                    else:
+                        self.engine.messages.add('The box is locked.')
+                else:
+                    ok = True
+                if ok:
+                    self.engine.event_handler = BoxHandler(box, self.engine)
+            else:
+                for l in self.player.loc.adj():
+                    door = self.game_map.entity(l, entity.Door)
+                    if door:
+                        if door.locked:
+                            k = self.player.inventory.get(entity.Key)
+                            if k:
+                                door.locked = False
+                                self.player.inventory.remove(k)
+                            self.engine.messages.add('The door is locked.')
+
+                        door.toggle()
+                        break
+                else:
+                    self.engine.messages.add('Nothing to open here..')
 
         elif key == keys.SLASH:
             self.engine.event_handler = LookHandler(self.engine)
@@ -172,7 +204,7 @@ class EventHandler(tcod.event.EventDispatch):
             if not ok and sum(locs_e)==1:
                 # change direction
                 mod = list(compress(mods, locs_e))[0]
-            elif ok and sum(locs_e)==2:
+            elif not ok or sum(locs_e)==2:
                 # open area, stop
                 break
 
@@ -278,6 +310,8 @@ class HashCommandHandler(EventHandler):
         if key==keys.RETURN:
             if self.cmd == 'break':
                 self.engine.event_handler = InventoryBreakHandler(self.engine)
+            elif self.cmd == 'kick':
+                self.engine.event_handler = KickHandler(self.engine)
             else:
                 self.engine.messages.add('Unknown command')
                 self.engine.event_handler = EventHandler(self.engine)
@@ -526,6 +560,41 @@ class InventoryDropHandler(InventoryEventHandler):
        a = DropItem()
        a.init(self.engine, self.engine.player, item=item)
        return a
+
+class KickHandler(EventHandler):
+    def ev_keydown(self, event):
+        keys = tcod.event.KeySym
+        for k in dir_keys:
+            if event.sym==getattr(keys, k):
+                loc = self.engine.player.loc.mod(*dir_keys[k])
+                from entity import Door, Box
+                ent = self.engine.game_map.entity(loc, (Door, Box))
+                dmg = 0
+                if ent:
+                    if random()>.5:
+                        self.engine.messages.add(f'{ent.__class__.__name__} holds')
+
+                    elif isinstance(ent, Door):
+                        self.engine.messages.add('Door breaks')
+                        self.engine.game_map.entities.remove(ent)
+                        if random()>.6:
+                            dmg = randint(6,25)
+                            self.engine.player.fighter.take_damage(dmg)
+
+                    elif isinstance(ent, Box) and ent.locked:
+                        self.engine.messages.add('Box lock breaks')
+                        ent.locked = False
+                        if random()>.6:
+                            dmg = randint(6,25)
+
+                if dmg:
+                    self.engine.player.fighter.take_damage(dmg)
+                    self.engine.messages.add(f'{self.engine.player} takes {dmg} damage.')
+                self.engine.event_handler = EventHandler(self.engine)
+                break
+        else:
+            self.engine.messages.add('Choose a direction..')
+
 
 class SelectIndexHandler(AskUserEventHandler):
     def __init__(self, engine):

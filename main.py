@@ -32,6 +32,7 @@ def game_loop(engine, console, context):
 
             if engine.game_map:
                 engine.update_fov()
+                engine.game_map.make_turn()
 
 
 def main():

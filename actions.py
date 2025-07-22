@@ -36,12 +36,21 @@ class MovementAction(DirectionAction):
             raise Impossible('Out of range')
         if not self.map.tiles['walkable'][loc.x, loc.y]:
             raise Impossible('Blocked')
+
+        # needed for fast-go
+        ent = self.map.get_blocking_entity_at_loc(loc)
+        if ent:
+            raise Impossible('Blocked')
         if move:
             self.e1.move(self.mod)
             if self.e1.is_player:
                 items = self.engine.game_map.names_at_loc(self.e1.loc, {self.e1})
                 if items:
                     self.engine.messages.add(f'You see {items}')
+                for r in self.map.auspicious_rooms():
+                    if loc in r and cloc not in r:
+                        self.engine.messages.add('You feel elated')
+                        break
 
         return True
 

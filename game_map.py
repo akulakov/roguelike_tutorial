@@ -61,6 +61,13 @@ class GameMap:
         self.visible = np.full((width, height), fill_value=False, order="F")
         self.explored = np.full((width, height), fill_value=False, order="F")
 
+    def make_turn(self):
+        for r in self.rooms:
+            r.auspicious = max(0, r.auspicious-1)
+
+    def auspicious_rooms(self):
+        return [r for r in self.rooms if r.auspicious]
+
     def find_room(self, loc):
         for r in self.rooms:
             p1,p2 = r.p1, r.p2
@@ -120,6 +127,11 @@ class GameMap:
         # for i in it:
             # print("i.loc", i.loc)
         l = [i for i in it if i.loc==loc]
+        if l:
+            return l[0]
+
+    def entity(self, loc, filter=object):
+        l = [e for e in self.entities if isinstance(e, filter) and e.loc==loc]
         if l:
             return l[0]
 

@@ -139,11 +139,21 @@ class Fighter:
         self._defense = defense
         self._power = power
 
+
+    def get_mod(self):
+        entity = self.entity
+        m = entity.engine.game_map
+        for r in m.rooms:
+            if r.auspicious and entity.loc in r:
+                print('in auspicious room!')
+                return 1.05
+        return 1
+
     def defense(self):
-        return self._defense + self.entity.equipment.defense_bonus
+        return int(round((self._defense + self.entity.equipment.defense_bonus)*self.get_mod()))
 
     def power(self):
-        return self._power + self.entity.equipment.power_bonus
+        return int(round((self._power + self.entity.equipment.power_bonus)*self.get_mod()))
 
     @property
     def hp(self):
