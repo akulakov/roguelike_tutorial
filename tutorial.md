@@ -65,3 +65,18 @@ Tutorial: Fragment of a fallen shrine
 
         * This may be confusing: even for the container, we run `check_gold` validator, but it will always return True
         for containers. Similarly `money_transfer` does not perform any action for containers.
+
+* Magic Missile
+
+    * https://github.com/akulakov/roguelike_tutorial/blob/8a8da4c1a771549b592c9b1e1aed369dd484620e/entity.py#L231
+
+    * Magic missile is a good example of a spell that works in two stages:
+
+        * event handler is set to DirectionHandler with a callback to the second stage. This handler prompts for a
+        direction and then calls the callback method on the spell class.
+
+        * second stage iterates over 6 tiles, drawing a missile character, uses the `sleep()` command to create the
+            animation, and then for each living entity on the tile, damage from spell is applied.
+
+        * this spell is a good templates for other spells or tools that run an input handler that gets some type of
+            player selection and then runs the action animation and applies appropriate game logic effects.
