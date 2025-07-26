@@ -120,10 +120,10 @@ def spawn(type, dungeon, engine, loc):
         m.inventory.add(entity.LightningScroll(engine))
 
     # spawn a box with contents
-    if isinstance(m, entity.Box):
+    if isinstance(m, (entity.Box, entity.UndergroundSpace)):
         items = get_entities_at_random(item_chances, randint(0,2), engine.level)
         for i in items:
-            if i!=entity.Box:
+            if i not in (entity.Box, entity.UndergroundSpace):
                 m.inventory.add(i(engine))
 
 E = entity
@@ -179,6 +179,14 @@ def place_special(room, dungeon, engine, cls):
         loc = Loc( randint(room.x1 + 1, room.x2 - 1), randint(room.y1 + 1, room.y2 - 1) )
         if not any(loc==entity.loc for entity in dungeon.entities):
             print("special cls", cls, loc)
+            spawn(cls, dungeon, engine, loc)
+            return
+
+def place_vertical(room, dungeon, engine, cls):
+    for _ in range(50):
+        loc = Loc( randint(room.x1 + 1, room.x2 - 1), randint(room.y1 + 1, room.y2 - 1) )
+        if loc not in (dungeon.left, dungeon.right, dungeon.up):
+            print("vertial cls", cls, loc)
             spawn(cls, dungeon, engine, loc)
             return
 
@@ -259,6 +267,7 @@ def generate_special_dungeon(max_rooms, room_min_size, room_max_size, map_width,
         cls = entity.special_data.get((engine.level,rnum))
         if cls:
             place_special(room, dungeon, engine, cls)
+        place_vertical(room, dungeon, engine, entity.UndergroundSpace)
         rnum += 1
     create_stairs(engine, dungeon, rooms, up_map)
     engine.total_levels += 1
@@ -362,7 +371,7 @@ def generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_hei
 
             if random()>.5:
                 for x,y in tun:
-                    if x in (r1.x1, r1.x2, r2.x1, r2.x2) or y in (r1.y1,r1.y2,r2.y1,r2.y2):
+                    if x in (r1.x1, r1.x2) or y in (r1.y1,r1.y2):
                         d = entity.Door(engine, x, y)
                         if random()>.8:
                             d.locked = True
@@ -383,9 +392,11 @@ def generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_hei
         place_entities(new_room, dungeon, engine)
         rooms.append(new_room)
 
+
         cls = entity.special_data.get((engine.level,rnum))
         if cls:
             place_special(new_room, dungeon, engine, cls)
+        place_vertical(new_room, dungeon, engine, entity.UndergroundSpace)
         rnum += 1
 
     create_stairs(engine, dungeon, rooms, up_map)
@@ -439,6 +450,7 @@ def create_stairs(engine, dungeon, rooms, up_map):
             raise Exception('No tile found for up_stairs')
 
 def hidden_room_tunnel(dungeon, room):
+    print("room", room)
     lst = dungeon.find_walkable(room.p1.mod(1,0), Loc(0,-1))
     if lst: return lst
 

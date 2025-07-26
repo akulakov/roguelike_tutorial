@@ -156,6 +156,15 @@ class Engine:
         context.present(console)
         console.clear()
 
+    def print(self, x, y, text, color):
+        console = self.console
+        context = self.context
+        if self.game_map:
+            self.game_map.render(self, console)
+        console.print(x,y,text,fg=color)
+        context.present(console)
+        console.clear()
+
     def save_as(self, filename):
         save_data = lzma.compress(pickle.dumps(self))
         with open(filename, "wb") as f:
@@ -185,6 +194,8 @@ def new_game():
     player.inventory.add(entity.Key(engine, entity=player))
     player.inventory.add(entity.LightningScroll(engine))
     player.inventory.add(entity.AuspiciousRoomScroll(engine))
+    player.inventory.add(entity.MagicMissileScroll(engine))
+    player.inventory.add(entity.Pickaxe(engine, entity=player))
     # player.inventory.add(entity.SwordOfRingingBell(engine, entity=player))
     EventHandler(engine)
     engine.update_fov()

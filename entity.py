@@ -1,3 +1,4 @@
+import time
 from enum import Enum, auto
 import tcod
 from random import choice, random
@@ -24,6 +25,7 @@ class Entity:
     _inventory = ()
     xp_given = 10
     id = None
+    vloc = None
 
     def __init__(self, engine, x=None, y=None, char=None, color=None, name=None, blocking=False):
         # print("engine", engine)
@@ -94,6 +96,7 @@ class Item(Entity):
         pass
 
 class Living(Blocking):
+    speed = 1
     is_alive = True
     is_seller = False
     render_order = 3
@@ -222,8 +225,45 @@ class AuspiciousRoomScroll(Item):
         print("r auspicious", r, r.auspicious)
 
 
-class LightningScroll(Item):
+class Scroll(Item):
     char = '~'
+
+class MagicMissileScroll(Scroll):
+    color = 247,145,35
+    base_price = 30
+    damage = 5
+    name = 'Magic Missile Scroll'
+
+    def activate(self):
+        self.engine.messages.add( 'Select a direction', Color.needs_target)
+        self.engine.event_handler = input_handlers.DirectionHandler(self.engine, callback=self.activate2)
+
+    def activate2(self, dir):
+        dir = Loc(*dir)
+        oloc = loc = self.engine.player.loc
+        if dir.x==-1:
+            oloc = oloc.mod(-5,0)
+        elif dir.y==-1:
+            oloc = oloc.mod(0,-5)
+        map = self.engine.game_map
+
+        oloc = oloc.mod(*dir)
+
+        for n in range(1, 6):
+            loc = loc.mod(*dir)
+            if not dir.y:
+                l = oloc if dir.is_pos() else loc
+                self.engine.print(*l, '-'*n, Color.red)
+            else:
+                self.engine.print(*loc, '|', Color.red)
+            time.sleep(0.1)
+
+            for e in list(map.get_all_living_at_loc(loc)):
+                e.fighter.take_damage(self.damage)
+                self.engine.messages.add(f'{e} suffers {self.damage} damage')
+        self.engine.player.inventory.remove(self)
+
+class LightningScroll(Scroll):
     color = 127,25,155
     name = 'Lightning Scroll'
     damage = 5
@@ -471,6 +511,7 @@ class BroomTroll(Hostile):
     fighter = 20,3,4
     _inventory = [Broom]
     xp_given = 50
+    speed = .5
 
 class ThwackingOrc(Orc):
     """These Orcs thwacks, with great force, anyone and anything unfriendly that comes near."""
@@ -695,6 +736,19 @@ class Door(Entity):
 
 class Key(Tool):
     color = 205, 100, 205
+
+class Pickaxe(Tool):
+    color = 25, 10, 205
+
+class UndergroundSpace(Entity):
+    vloc = -1
+    char = ''
+    vchar = 'V'
+    color = 205, 100, 205
+
+    def __init__(self, engine, *a, **kw):
+        self.inventory = Inventory(engine, self, 20)
+        super().__init__(engine, *a, **kw)
 
 
 special_data = SpecialData()

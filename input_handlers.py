@@ -10,9 +10,13 @@ from util import Loc
 from game_map import Color
 import tile_types
 
-dir_keys = dict(
+dir_keys_cardinal = dict(
+    h=(-1,0), j=(0,1), k=(0,-1), l=(1,0)
+)
+
+dir_keys = dict(dir_keys_cardinal,
     y=(-1,-1), u=(1,-1), b=(-1,1), n=(1,1),
-    h=(-1,0), j=(0,1), k=(0,-1), l=(1,0))
+)
 
 CONFIRM_KEYS = {
    tcod.event.KeySym.RETURN,
@@ -108,6 +112,16 @@ class EventHandler(tcod.event.EventDispatch):
             self.engine.event_handler = CharacterScreenEventHandler(self.engine)
         elif key == keys.i:
             self.engine.event_handler = InventoryActivateHandler(self.engine)
+
+        elif key == keys.d and Shift:
+            p = self.player
+            usp = self.game_map.entity(p.loc, entity.UndergroundSpace)
+            if not isinstance(p.equipment.tool, entity.Pickaxe):
+                self.engine.messages.add('Nothing to dig with!')
+            elif not usp:
+                self.engine.messages.add('You do not find anything')
+            else:
+                self.engine.event_handler = UndergroundSpaceHandler(usp, self.engine)
 
         # OPEN DOORS / BOXES
         elif key == keys.o:
@@ -408,7 +422,7 @@ class PickupEventHandler(InventoryEventHandler):
 
     def on_item_selected(self, item):
         self.engine.player.inventory.add(item)
-        self.engine.game_map.items.remove(item)
+        self.engine.game_map.entities.remove(item)
 
 class TransferBetweenInventoriesHandler(AskUserEventHandler):
     page = 0
@@ -536,6 +550,10 @@ class BoxHandler(TransferBetweenInventoriesHandler):
     title = 'Box'
     is_shop = False
 
+class UndergroundSpaceHandler(TransferBetweenInventoriesHandler):
+    title = 'Underground'
+    is_shop = False
+
 class InventoryActivateHandler(InventoryEventHandler):
    title = 'Select an item to use'
    action = 'activate'
@@ -560,6 +578,24 @@ class InventoryDropHandler(InventoryEventHandler):
        a = DropItem()
        a.init(self.engine, self.engine.player, item=item)
        return a
+
+class DirectionHandler(EventHandler):
+    def __init__(self, *a, callback=None, **kw):
+        self.callback = callback
+        super().__init__(*a, **kw)
+
+    def ev_keydown(self, event):
+        keys = tcod.event.KeySym
+        for k in dir_keys_cardinal:
+            if event.sym==getattr(keys, k):
+                self.callback(dir_keys_cardinal[k])
+                self.engine.event_handler = EventHandler(self.engine)
+                break
+        else:
+            if event.sym==keys.ESCAPE:
+                self.engine.event_handler = EventHandler(self.engine)
+            else:
+                self.engine.messages.add('Pick a direction [hjkl]')
 
 class KickHandler(EventHandler):
     def ev_keydown(self, event):
@@ -825,6 +861,7 @@ class CharacterScreenEventHandler(AskUserEventHandler):
         console.print( x=x + 1, y=y + 3, string=f"XP for next Level: {p.level.experience_to_next_level}")
         console.print( x=x + 1, y=y + 4, string=f"Attack: {p.fighter._power}")
         console.print( x=x + 1, y=y + 5, string=f"Defense: {p.fighter._defense}")
+
 
 class QuestsHandler(AskUserEventHandler):
     title = 'Quests'

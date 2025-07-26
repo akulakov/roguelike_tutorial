@@ -110,6 +110,11 @@ class GameMap:
                 l.append(entity)
         return l
 
+    def get_all_living_at_loc(self, loc):
+        for entity in self.entities:
+            if entity.is_alive and entity.loc==loc:
+                yield entity
+
     def get_living_at_loc(self, loc):
         for entity in self.entities:
             if entity.is_alive and entity.loc==loc:
@@ -177,6 +182,7 @@ class GameMap:
         self.render_names_at_location(console, engine.mouse_loc, Loc(21,44))
         engine.messages.render(console, 21, 45, 40, 5)
         console.print( x=1, y=47, string=f'{engine.player.loc}')
+        self.render_vertical_view(engine, console)
 
     def render_bar(self, console, current_value, maximum_value, total_width):
         bar_width = int(float(current_value) / maximum_value * total_width)
@@ -188,14 +194,43 @@ class GameMap:
 
         console.print( x=1, y=46, string=f"HP: {current_value}/{maximum_value}", fg=Color.bar_text)
 
+    def render_vertical_view(self, engine, console):
+        if engine.player.loc.x>40:
+            x = 1
+        else:
+            x = 70
+        console.draw_frame(x=x, y=33, width=5, height=9, title=None, clear=True, fg=Color.white, bg=Color.black)
+        console.print(x+2, 38, '@', fg=Color.white)
+        console.print(x+1, 39, '---', fg=Color.white)
+        for e in self.entities:
+            if e.loc==engine.player.loc and e.vloc:
+                if e.vloc==-1:
+                    console.print(x+2, 40, e.vchar, fg=Color.white)
+
+
     def find_walkable(self, loc, dir):
         l = [loc]
+        def in_bounds_walkable(loc):
+            return self.in_bounds(loc) and self.walkable(loc)
+
         for _ in range(100):
+            prev_loc = loc
             loc = loc.mod(dir.x, dir.y)
             if not self.in_bounds(loc):
                 return
+
             if self.walkable(loc):
+                if not dir.x:
+                    if in_bounds_walkable(prev_loc.mod(1,0)) or in_bounds_walkable(prev_loc.mod(-1,0)):
+                        return
+
+                if not dir.y:
+                    if in_bounds_walkable(prev_loc.mod(0,1)) or in_bounds_walkable(prev_loc.mod(0,-1)):
+                        return
+
                 return l
+
+
             l.append(loc)
 
 

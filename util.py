@@ -22,8 +22,11 @@ class Loc:
             l.append(copy(self))
         return l
 
-    def mod(self, mx=0, my=0):
-        return Loc(self.x+mx, self.y+my)
+    def mod(self, mx=0, my=0, mult=1):
+        return Loc(self.x+mx*mult, self.y+my*mult)
+
+    def is_pos(self):
+        return self.x>0 or self.y>0
 
     def perpendicular_dirs(self, mod):
         """Given a direction, give 2 perpendiculars, i.e. for right, return up and down, etc."""
@@ -51,3 +54,6 @@ class Loc:
 
     def __hash__(self):
         return hash(tuple(self))
+
+    def opposite(self):
+        return Loc(-self.x, -self.y)
