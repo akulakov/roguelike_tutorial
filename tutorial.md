@@ -1,5 +1,9 @@
 Tutorial: Fragment of a fallen shrine
 
+This tutorial is to some degree based on https://rogueliketutorials.com/tutorials/tcod/v2/ , and the functionality of
+the game continues from where that tutorial left off, it may be useful to first read through the tutorial above, and
+then continue here.
+
 * main game loop:
 
     https://github.com/akulakov/roguelike_tutorial/blob/42b0cf21138fe83cc69753de61b31c14a9e356b1/main.py#L11

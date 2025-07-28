@@ -3,6 +3,12 @@ Roguelike tutorial
 This tutorial is to some degree based on the excellent tcod-tutorial (TStand90), it has the same functionality at the
 end of that tutorial and the goal is to push it further.
 
+Installing and running
+-----------------------------------------------------------------------------------------------
+
+    * pip3 install -r requirements.txt
+    * ./main.py
+
 Some notable differences:
 
  - The structure of classes and inheritance is simplified.
