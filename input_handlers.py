@@ -1,3 +1,4 @@
+from copy import deepcopy
 from random import random, randint
 from textwrap import wrap
 from itertools import compress
@@ -5,6 +6,7 @@ import traceback
 import tcod.event
 from tcod import libtcodpy
 
+import constants
 from actions import BumpAction, WaitAction, MovementAction, PickupAction, Impossible, DropItem
 from util import Loc
 from game_map import Color
@@ -26,6 +28,7 @@ CONFIRM_KEYS = {
 
 class EventHandler(tcod.event.EventDispatch):
     go = False
+    cursor = None
 
     def __init__(self, engine, *a, **kw):
         self.engine = engine
@@ -43,17 +46,19 @@ class EventHandler(tcod.event.EventDispatch):
         keys = tcod.event.KeySym
         engine = self.engine
         self.game_map = engine.game_map
-
-        for k in dir_keys:
-            if key==getattr(keys, k):
-                mod = Loc(*dir_keys[k])
-                if self.go:
-                    mod = self.fast_go(mod)
-                action = BumpAction(mod)
-        self.go = False
         Shift = event.mod & tcod.event.Modifier.SHIFT
+
+        if not Shift:
+            for k in dir_keys:
+                if key==getattr(keys, k):
+                    mod = Loc(*dir_keys[k])
+                    if self.go:
+                        mod = self.fast_go(mod)
+                    action = BumpAction(mod)
+
+        self.go = False
         import entity
-        # print("key", key)
+
         if key == keys.g:
             self.go = True
         elif key == keys.PERIOD and Shift:
@@ -64,6 +69,14 @@ class EventHandler(tcod.event.EventDispatch):
         elif key == keys.COMMA and Shift:
             if self.player.loc == self.game_map.up.loc:
                 self.engine.up()
+        elif key == keys.e and Shift and constants.DEBUG:
+            # EDITOR
+            self.game_map.cursor = engine.player.loc
+            engine.event_handler = MapEditorHandler(self.engine)
+        elif key == keys.w and Shift and constants.DEBUG:
+
+            self.write_custom_map()
+
         elif key == keys.s and Shift:
             for l in self.player.loc.adj():
                 if self.game_map.tiles[l] == tile_types.hidden_passage:
@@ -171,7 +184,7 @@ class EventHandler(tcod.event.EventDispatch):
             self.engine.event_handler = InventoryDropHandler(self.engine)
         elif key == keys.q and Shift:
             self.engine.event_handler = QuestsHandler(self.engine)
-        elif key == keys.r and Shift:
+        elif key == keys.r and Shift and constants.DEBUG:
             self.game_map.reveal = not self.game_map.reveal
         elif key == keys.s:
             for l in self.player.loc.adj():
@@ -184,7 +197,8 @@ class EventHandler(tcod.event.EventDispatch):
 
         if key == keys.ESCAPE:
             engine.context = None  # tcod context cannot be pickled
-            self.save_game('game.sav')
+            engine.game_map.cursor = None   # EDITOR cursor
+            self.save_game('game.sav', 'custom_maps.dat')
             raise SystemExit()
 
         if self.player.level.requires_level_up:
@@ -192,8 +206,34 @@ class EventHandler(tcod.event.EventDispatch):
 
         return action
 
-    def save_game(self, filename):
-        self.engine.save_as(filename)
+    def write_custom_map(self):
+        self.engine.event_handler = TextInputHandler(self.engine, callback=self._write_custom_map)
+
+    def _write_custom_map(self, name):
+        if not name.strip():
+            return
+        gm = self.game_map
+
+        ent = gm.entities
+        up = gm.up
+        if gm.up:
+            gm.up.game_map = None
+        gm.entities = None
+        gm = deepcopy(gm)
+        # map.up.game_map = map.up.above_loc = None
+        gm.entities = set()
+        self.engine.custom_maps[name] = gm
+
+        # restore current map
+        gm = self.game_map
+        gm.entities = ent
+        gm.up = up
+        print('custom maps:')
+        for n in self.engine.custom_maps:
+            print(n)
+
+    def save_game(self, filename, maps_filename):
+        self.engine.save_as(filename, maps_filename)
         print("Game saved.")
 
     def ev_mousemotion(self, event):
@@ -229,6 +269,65 @@ class EventHandler(tcod.event.EventDispatch):
 
     def on_render(self, console):
         pass
+
+class MapEditorHandler(EventHandler):
+    def ev_keydown(self, event):
+        key = event.sym
+        keys = tcod.event.KeySym
+        engine = self.engine
+        game_map = self.game_map = engine.game_map
+        Shift = event.mod & tcod.event.Modifier.SHIFT
+        c = self.game_map.cursor
+
+        if not Shift:
+            for k in dir_keys:
+                if key==getattr(keys, k):
+                    mod = Loc(*dir_keys[k])
+                    self.game_map.cursor = self.game_map.cursor.mod(*mod)
+
+        if key==keys.w:
+            self.game_map.tiles[c.x,c.y] = tile_types.wall
+        elif key==keys.x:
+            self.game_map.tiles[c.x,c.y] = tile_types.floor
+        elif key==keys.e or key==keys.ESCAPE:
+            self.game_map.cursor = None
+            self.engine.event_handler = EventHandler(self.engine)
+        elif key==keys.f:
+            for x in range(80):
+                for y in range(45):
+                    game_map.tiles[x,y] = tile_types.wall if Shift else tile_types.floor
+        elif key==keys.r:
+            self.engine.event_handler = TextInputHandler(self.engine, callback=self.make_room, prompt='enter width height > ')
+        elif key==keys.l and Shift:
+            self.engine.event_handler = TextInputHandler(self.engine, callback=self.make_line, prompt='enter dir[hjkl] length > ')
+
+    def make_room(self, txt):
+        c = self.game_map.cursor
+        map = self.game_map
+        try:
+            w,h=txt.split()
+            w,h = int(w), int(h)
+            for x in range(c.x, c.x+w):
+                for y in range(c.y, c.y+h):
+                    map.tiles[x,y] = tile_types.floor
+        except Exception as e:
+            print(e)
+            self.engine.messages.add('wrong input..')
+        self.engine.event_handler = MapEditorHandler(self.engine)
+
+    def make_line(self, txt):
+        c = self.game_map.cursor
+        map = self.game_map
+        try:
+            d,l=txt.split()
+            d,l = d, int(l)
+            for _ in range(l):
+                map.tiles[c.x,c.y] = tile_types.floor
+                c = c.mod(*dir_keys_cardinal[d])
+        except Exception as e:
+            print(e)
+            self.engine.messages.add('wrong input..')
+        self.engine.event_handler = MapEditorHandler(self.engine)
 
 CURSOR_Y_KEYS = {
     tcod.event.KeySym.UP: -1,
@@ -307,6 +406,30 @@ class HistoryViewer(EventHandler):
         else:  # Any other key moves back to the main game state.
             self.engine.event_handler = EventHandler(self.engine)
 
+class TextInputHandler(EventHandler):
+    def __init__(self, *a, callback=None, prompt='> ', **kw):
+        self.cmd = ''
+        self.callback = callback
+        self.prompt = prompt
+        super().__init__(*a, **kw)
+
+    def on_render(self, console):
+        console.print(15, 35, self.prompt + self.cmd)
+        super().on_render(console)
+
+    def ev_keydown(self, event):
+        keys = tcod.event.KeySym
+        key = event.sym
+        if key==keys.RETURN:
+            if self.callback:
+                self.callback(self.cmd)
+            self.engine.event_handler = EventHandler(self.engine)
+            return
+        else:
+            try:
+                self.cmd += chr(key.value)
+            except ValueError:
+                pass
 
 class HashCommandHandler(EventHandler):
     def __init__(self, *a, **kw):
@@ -314,7 +437,7 @@ class HashCommandHandler(EventHandler):
         super().__init__(*a, **kw)
 
     def on_render(self, console):
-        console.print(2, 35, '# ' + self.cmd)
+        console.print(15, 35, '# ' + self.cmd)
         super().on_render(console)
 
     def ev_keydown(self, event):
@@ -728,11 +851,12 @@ class MainMenu(EventHandler):
 
     def ev_keydown(self, event):
         from engine import load_game, new_game
+        custom_maps_fn = 'custom_maps.dat'
         if event.sym in (tcod.event.KeySym.q, tcod.event.KeySym.ESCAPE):
             raise SystemExit()
         elif event.sym == tcod.event.KeySym.c:
             try:
-                engine = load_game('game.sav')
+                engine = load_game('game.sav', custom_maps_fn)
                 engine.context = self.engine.context
                 return EventHandler(engine)
             except FileNotFoundError:
@@ -741,7 +865,7 @@ class MainMenu(EventHandler):
                 traceback.print_exc()
                 self.engine.event_handler = PopupMessage(self, f"Failed to load save:\n{exc}")
         elif event.sym == tcod.event.KeySym.n:
-            return EventHandler(new_game()[0])
+            return EventHandler(new_game(custom_maps_fn)[0])
 
 class ConversationHandler(EventHandler):
     def __init__(self, parent_handler, conversation, *a, on_yes=None, **kw):

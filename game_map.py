@@ -1,5 +1,7 @@
+from random import randint
 import textwrap
 import numpy as np  # type: ignore
+import json
 
 import tile_types
 from util import Loc
@@ -44,6 +46,12 @@ class Stairs:
     def __repr__(self):
         return f'<{self.game_map}, {self.loc}>'
 
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
+
 class GameMap:
     up = None
     left = None
@@ -52,14 +60,44 @@ class GameMap:
     rooms = None
     hidden_rooms = None
     reveal = False
+    cursor = None
 
-    def __init__(self, width, height, entities, level, up_map=None):
+    def __init__(self, width, height, entities, level):
         self.level = level
         self.entities = entities
         self.width, self.height = width, height
         self.tiles = np.full((width, height), fill_value=tile_types.wall, order="F")
         self.visible = np.full((width, height), fill_value=False, order="F")
         self.explored = np.full((width, height), fill_value=False, order="F")
+
+    def serialize(self):
+        up, left, right = self.up, self.left, self.right
+        up = tuple(up.loc) if up else None
+        left = tuple(left.loc) if left else None
+        right = tuple(right.loc) if right else None
+        # tiles = json.dumps(self.tiles, cls=NumpyEncoder)
+        d = dict(width=self.width, height=self.height, tiles=self.tiles, up=up, left=left, right=right)
+        return json.dumps(d, cls=NumpyEncoder)
+
+    @staticmethod
+    def load(data):
+        # d = data
+        d = data = json.loads(data)
+        m = GameMap(d['width'], d['height'], set(), 1)
+        rows = d['tiles']
+        for p,r in enumerate(rows):
+            for q,col in enumerate(r):
+                a,b,c,d=col
+                m.tiles[p,q] = np.array((a,b,tuple(c),tuple(d)), dtype=tile_types.tile_dt)
+
+        up, left, right = data['up'], data['left'], data['right']
+        if up:
+            m.up = Stairs(Loc(*up))
+        if left:
+            m.left = Stairs(Loc(*left), down_dir='left')
+        if right:
+            m.right = Stairs(Loc(*right), down_dir='right')
+        return m
 
     def make_turn(self):
         for r in self.rooms:
@@ -144,6 +182,9 @@ class GameMap:
         """Return True if x and y are inside of the bounds of this map."""
         return 0 <= loc.x < self.width and 0 <= loc.y < self.height
 
+    def random(self):
+        return Loc(randint(0, self.width), randint(0, self.height))
+
     def empty_lst(self, locs):
         return [l for l in locs if self.empty(l)]
 
@@ -152,6 +193,12 @@ class GameMap:
 
     def walkable(self, loc):
         return self.tiles['walkable'][loc.x, loc.y]
+
+    def random_empty(self):
+        for _ in range(100):
+            l = self.random()
+            if self.empty(l):
+                return l
 
     def empty(self, loc):
         if not self.in_bounds(loc):
@@ -184,6 +231,10 @@ class GameMap:
         console.print( x=1, y=47, string=f'{engine.player.loc}')
         self.render_vertical_view(engine, console)
 
+        if self.cursor:
+            console.print(x=30, y=1, string='-- EDITOR -- EDITOR --')
+            console.print(*self.cursor, string='*')
+
     def render_bar(self, console, current_value, maximum_value, total_width):
         bar_width = int(float(current_value) / maximum_value * total_width)
 
@@ -195,15 +246,23 @@ class GameMap:
         console.print( x=1, y=46, string=f"HP: {current_value}/{maximum_value}", fg=Color.bar_text)
 
     def render_vertical_view(self, engine, console):
-        if engine.player.loc.x>40:
+        loc = engine.player.loc
+        if loc.x>40:
             x = 1
         else:
             x = 70
         console.draw_frame(x=x, y=33, width=5, height=9, title=None, clear=True, fg=Color.white, bg=Color.black)
         console.print(x+2, 38, '@', fg=Color.white)
         console.print(x+1, 39, '---', fg=Color.white)
+
+        if loc in (self.left and self.left.loc, self.right and self.right.loc):
+            console.print(x+2, 40, '=', fg=Color.white)
+        elif self.up and loc==self.up.loc:
+            for y in (37,36,35,34):
+                console.print(x+2, y, '=', fg=Color.white)
+
         for e in self.entities:
-            if e.loc==engine.player.loc and e.vloc:
+            if e.loc==loc and e.vloc:
                 if e.vloc==-1:
                     console.print(x+2, 40, e.vchar, fg=Color.white)
 

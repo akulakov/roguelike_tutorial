@@ -38,7 +38,7 @@ def game_loop(engine, console, context):
 def main():
     engine, screen_width, screen_height, tileset = start()
 
-    with tcod.context.new_terminal(screen_width, screen_height, tileset=tileset, title="Game21", vsync=True) as context:
+    with tcod.context.new_terminal(screen_width, screen_height, tileset=tileset, title='Fragment of a fallen shrine', vsync=True) as context:
         root_console = tcod.console.Console(screen_width, screen_height, order="F")
         engine.context = context
         engine.console = root_console

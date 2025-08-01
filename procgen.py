@@ -1,7 +1,7 @@
 from copy import copy
 from random import randint, random, choice, choices
 from dataclasses import dataclass
-from game_map import GameMap
+from game_map import GameMap, Stairs
 import tile_types
 import entity
 from util import Loc
@@ -253,11 +253,21 @@ def l_line(a, b):
 
 
 def generate_special_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_height, player, engine, up_map, special_level):
-    dungeon = GameMap(map_width, map_height, {player}, up_map)
+    if special_level.custom_map:
+        dungeon = engine.custom_maps[special_level.custom_map]
+        dungeon.entities = {player}
+        dungeon.level = engine.level+1
+        print("dungeon.up", dungeon.up)
+        print("engine", engine)
+        if not dungeon.up:
+            dungeon.up = Stairs(engine.game_map.random_empty(), above_loc=player.loc)
+        dungeon.up.game_map = engine.game_map
+    else:
+        dungeon = GameMap(map_width, map_height, {player}, engine.level+1)
     engine.game_map = dungeon
     rooms = []
     rnum = 1
-    for r in special_level.rooms:
+    for r in special_level.rooms or ():
         room = RectangularRoom(*r)
         rooms.append(room)
         dungeon.tiles[room.inner] = tile_types.floor
@@ -269,7 +279,8 @@ def generate_special_dungeon(max_rooms, room_min_size, room_max_size, map_width,
             place_special(room, dungeon, engine, cls)
         place_vertical(room, dungeon, engine, entity.UndergroundSpace)
         rnum += 1
-    create_stairs(engine, dungeon, rooms, up_map)
+    if not special_level.custom_map:
+        create_stairs(engine, dungeon, rooms, up_map)
     engine.total_levels += 1
     dungeon.rooms = rooms
     return dungeon
@@ -277,7 +288,7 @@ def generate_special_dungeon(max_rooms, room_min_size, room_max_size, map_width,
 
 def generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_height, player, engine, up_map):
     rooms = []
-    dungeon = GameMap(map_width, map_height, {player}, up_map)
+    dungeon = GameMap(map_width, map_height, {player}, engine.level+1)
 
     # set this so that spawned monsters can set it from engine
     engine.game_map = dungeon
@@ -406,7 +417,6 @@ def generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_hei
     return dungeon
 
 def create_stairs(engine, dungeon, rooms, up_map):
-    from game_map import Stairs
     locs = ()
     if engine.total_levels <= engine.max_levels:
         loc = loc2 = 0

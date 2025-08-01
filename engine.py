@@ -2,9 +2,10 @@ import re
 from random import shuffle
 import lzma, pickle
 import tcod
+import json
 import binarytree
 from tcod.map import compute_fov
-from game_map import MessageLog
+from game_map import MessageLog, GameMap
 from util import Loc
 from actions import Impossible
 import entity
@@ -37,6 +38,7 @@ class Engine:
         self.cur_node.parent = None
         self.specials = {}
         self.quests = {}
+        self.custom_maps = {}
 
     def incomplete_nodes(self, node, lst):
         """Nodes that have stairs but respective game-maps were not yet generated."""
@@ -165,10 +167,22 @@ class Engine:
         context.present(console)
         console.clear()
 
-    def save_as(self, filename):
+    def save_as(self, filename, maps_filename):
         save_data = lzma.compress(pickle.dumps(self))
         with open(filename, "wb") as f:
             f.write(save_data)
+        d = {}
+        for n, map in self.custom_maps.items():
+            d[n] = map.serialize()
+        with open(maps_filename, "w") as f:
+            f.write(json.dumps(d))
+
+    def load_custom_maps(self, data):
+        d = {}
+        for n, jdata in data.items():
+            d[n] = GameMap.load(jdata)
+        return d
+
 
 def start():
     tileset = tcod.tileset.load_tilesheet( "dejavu10x10_gs_tc.png", 32, 8, tcod.tileset.CHARMAP_TCOD)
@@ -177,7 +191,7 @@ def start():
     MainMenu(engine)
     return engine, screen_width, screen_height, tileset
 
-def new_game():
+def new_game(maps_filename):
     """Return a brand new game session as an Engine instance."""
     tileset = tcod.tileset.load_tilesheet( "dejavu10x10_gs_tc.png", 32, 8, tcod.tileset.CHARMAP_TCOD)
     player = entity.Player(None, int(screen_width / 2), int(screen_height / 2))
@@ -196,9 +210,11 @@ def new_game():
     player.inventory.add(entity.AuspiciousRoomScroll(engine))
     player.inventory.add(entity.MagicMissileScroll(engine))
     player.inventory.add(entity.Pickaxe(engine, entity=player))
-    # player.inventory.add(entity.SwordOfRingingBell(engine, entity=player))
+    player.inventory.add(entity.SwordOfRingingBell(engine, entity=player))
     EventHandler(engine)
     engine.update_fov()
+    with open(maps_filename, 'r') as f:
+        engine.custom_maps = engine.load_custom_maps(json.loads(f.read()))
     return engine, screen_width, screen_height, tileset
 
 def new_map(engine, player, up_map=None):
@@ -208,16 +224,25 @@ def new_map(engine, player, up_map=None):
     room_min_size = 6
     max_rooms = 5
     level = engine.level + 1
-    special_level = entity.special_data.levels.get(level)
-    if special_level and special_level.id not in engine.specials:
-        dungeon = generate_special_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_height, player, engine, up_map, special_level)
-        engine.specials[special_level.id] = dungeon
-    else:
+    special_levels = entity.special_data.levels.get(level) or ()
+    if special_levels:
+        shuffle(special_levels)
+    special = False
+    for special_level in special_levels:
+        if special_level.id not in engine.specials:
+            dungeon = generate_special_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_height, player, engine, up_map, special_level)
+            engine.specials[special_level.id] = dungeon
+            special = True
+            break
+    if not special:
         dungeon = generate_dungeon(max_rooms, room_min_size, room_max_size, map_width, map_height, player, engine, up_map)
     return dungeon
 
-def load_game(filename):
-    with open(filename, "rb") as f:
+def load_game(filename, maps_filename):
+    with open(filename, 'rb') as f:
         engine = pickle.loads(lzma.decompress(f.read()))
     assert isinstance(engine, Engine)
+    with open(maps_filename, 'r') as f:
+        engine.custom_maps = engine.load_custom_maps(json.loads(f.read()))
+        print("engine.custom_maps", list(engine.custom_maps))
     return engine

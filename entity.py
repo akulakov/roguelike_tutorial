@@ -1,3 +1,4 @@
+from collections import defaultdict
 import time
 from enum import Enum, auto
 import tcod
@@ -409,6 +410,7 @@ class IDs(Enum):
     julius_mattius = auto()
     note1 = auto()
     level_a = auto()
+    level_b = auto()
     sword_ringing_bell = auto()
     broken_sword_ringing_bell = auto()
     martinella = auto()
@@ -685,18 +687,25 @@ class JuliusConversation(Conversation):
 class SpecialLevel:
     id = None
     level = None
+    custom_map = None
+    rooms = None
 
 class LevelA(SpecialLevel):
     id = IDs.level_a
-    level = 2
+    level = 10
     rooms = [(5,5,70,15),]
+
+class LevelB(SpecialLevel):
+    id = IDs.level_b
+    level = 3
+    custom_map = 'a'
 
 class SpecialData:
     """Special NPCs, items, conversations, levels, quests."""
     def __init__(self):
         self.data = {}
         self.conversations = {}
-        self.levels = {}
+        self.levels = defaultdict(list)
         self.quests = {}
         for obj in globals().values():
             try:
@@ -705,7 +714,7 @@ class SpecialData:
                 elif issubclass(obj, Conversation) and obj.id:
                     self.conversations[obj.id] = obj()
                 elif issubclass(obj, SpecialLevel) and obj.level:
-                    self.levels[obj.level] = obj
+                    self.levels[obj.level].append(obj)
                 elif issubclass(obj, Quest) and obj.id:
                     self.quests[obj.id] = obj
             except TypeError:

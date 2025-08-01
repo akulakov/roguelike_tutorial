@@ -21,3 +21,38 @@ Some notable differences:
  - The levels branch out in a tree-like way.
 
  - `m` commands shows the map of levels.
+
+Commands
+-----------------------------------------------------------------------------------------------
+
+ - <, > : up / down stairs
+
+ - E : map editor
+ - W : save current map as a named custom map
+ - S : search
+ - . : wait
+ - Space : talk
+ - v : history
+ - # break  : break an item
+ - m : map view
+ - c : character view
+ - i : inventory
+ - d : drop
+ - D : dig
+ - o : open box / door
+ - / : look
+ - Q : quests
+ - s : shop / trade with a shopkeeper
+
+ - w : wall
+ - x : floor
+ - e / ESCAPE : back to normal mode
+ - f : fill level with floor
+ - F : fill level with walls
+ - r : create a room
+ - l : create a tunnel
+
+
+
+
+
