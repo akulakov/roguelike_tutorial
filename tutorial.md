@@ -6,7 +6,7 @@ then continue here.
 
 * main game loop:
 
-    https://github.com/akulakov/roguelike_tutorial/blob/42b0cf21138fe83cc69753de61b31c14a9e356b1/main.py#L11
+    https://github.com/akulakov/roguelike_tutorial/blob/42b0cf21138fe83cc69753de61b31c14a9e356b1/main.py#L11-L34
 
     The main loop does the following:
 
@@ -39,7 +39,7 @@ then continue here.
 
 * special entities (NPCs and unique items)
 
-    https://github.com/akulakov/roguelike_tutorial/blob/9d60ed8e977662720151ce67f25b35c121d4558d/entity.py#L456
+    https://github.com/akulakov/roguelike_tutorial/blob/9d60ed8e977662720151ce67f25b35c121d4558d/entity.py#L456-L464
 
     * Special entites have a unique `id` and usually will be `is_hostile=False` and there will
     probably be a handful of ways to tie them to a location, but for now the `_loc` attribute will have level and room
@@ -70,9 +70,17 @@ then continue here.
         * This may be confusing: even for the container, we run `check_gold` validator, but it will always return True
         for containers. Similarly `money_transfer` does not perform any action for containers.
 
+    * https://github.com/akulakov/roguelike_tutorial/blob/0203d5dc5ab902628ed07a5d27035d7740c55d49/input_handlers.py#L407-L416
+
+        * This code block iterates over player inventory, prints letter to be used to reference
+        each item, item name.
+        * If this is a shop, price (10% under the list price), is printed next to the item. When
+        you sell an item you found, you lose 10% compared to what the item would be normally, to
+        make the game more challenging!
+
 * Magic Missile
 
-    * https://github.com/akulakov/roguelike_tutorial/blob/8a8da4c1a771549b592c9b1e1aed369dd484620e/entity.py#L231
+    * https://github.com/akulakov/roguelike_tutorial/blob/8a8da4c1a771549b592c9b1e1aed369dd484620e/entity.py#L231-L264
 
     * Magic missile is a good example of a spell that works in two stages:
 
