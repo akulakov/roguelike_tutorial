@@ -59,6 +59,10 @@ class EventHandler(tcod.event.EventDispatch):
         self.go = False
         import entity
 
+        if self.player.asleep>0:
+            engine.messages.add('You are asleep')
+            return WaitAction()
+
         if key == keys.g:
             self.go = True
         elif key == keys.PERIOD and Shift:
@@ -940,9 +944,9 @@ class LevelUpEventHandler(AskUserEventHandler):
         console.print(x=x + 1, y=1, string="Congratulations! You level up!")
         console.print(x=x + 1, y=2, string="Select an attribute to increase.")
 
-        console.print(x=x + 1, y=4, string=f"a) Constitution (+20 HP, from {self.engine.player.fighter.max_hp})")
-        console.print(x=x + 1, y=5, string=f"b) Strength (+1 attack, from {self.engine.player.fighter._power})")
-        console.print(x=x + 1, y=6, string=f"c) Agility (+1 defense, from {self.engine.player.fighter._defense})")
+        console.print(x=x + 1, y=4, string=f"a) HP (+20 HP, from {self.engine.player.fighter.max_hp})")
+        console.print(x=x + 1, y=5, string=f"b) Attack (+1 attack, from {self.engine.player.fighter._power})")
+        console.print(x=x + 1, y=6, string=f"c) Defense (+1 defense, from {self.engine.player.fighter._defense})")
 
     def ev_keydown(self, event):
         player = self.engine.player
@@ -978,13 +982,14 @@ class CharacterScreenEventHandler(AskUserEventHandler):
             x = 0
         y = 0
         width = len(self.title) + 4
-        console.draw_frame( x=x, y=y, width=width, height=7, title=self.title, clear=True, fg=(255, 255, 255), bg=(0, 0, 0),)
+        console.draw_frame( x=x, y=y, width=width, height=8, title=self.title, clear=True, fg=(255, 255, 255), bg=(0, 0, 0),)
         p = self.engine.player
         console.print( x=x + 1, y=y + 1, string=f"Level: {p.level.level}")
         console.print( x=x + 1, y=y + 2, string=f"XP: {p.level.current_xp}")
         console.print( x=x + 1, y=y + 3, string=f"XP for next Level: {p.level.experience_to_next_level}")
         console.print( x=x + 1, y=y + 4, string=f"Attack: {p.fighter._power}")
         console.print( x=x + 1, y=y + 5, string=f"Defense: {p.fighter._defense}")
+        console.print( x=x + 1, y=y + 6, string=f"Strength: {p.strength}")
 
 
 class QuestsHandler(AskUserEventHandler):

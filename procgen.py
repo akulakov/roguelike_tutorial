@@ -1,6 +1,8 @@
 from copy import copy
 from random import randint, random, choice, choices
 from dataclasses import dataclass
+import tcod
+
 from game_map import GameMap, Stairs
 import tile_types
 import entity
@@ -118,6 +120,9 @@ def spawn(type, dungeon, engine, loc):
         for i in items:
             m.inventory.add(i(engine))
         m.inventory.add(entity.LightningScroll(engine))
+        if random()>.5:
+            m.asleep = -1
+            #print('in spawn, adding', m, m.loc, m.asleep)
 
     # spawn a box with contents
     if isinstance(m, (entity.Box, entity.UndergroundSpace)):
@@ -136,7 +141,7 @@ item_chances = {
 }
 
 enemy_chances = {
-   0: [(E.Orc, 80)],
+   0: [(E.Orc, 20), (E.GiantAnt, 80)],
    3: [(E.BroomTroll, 85)],
    5: [(E.Troll, 30)],
    7: [(E.Troll, 60)],
@@ -173,6 +178,13 @@ def place_entities(room, dungeon, engine):
         loc = Loc( randint(room.x1 + 1, room.x2 - 1), randint(room.y1 + 1, room.y2 - 1) )
         if not any(loc==entity.loc for entity in dungeon.entities):
             spawn(e, dungeon, engine, loc)
+            if issubclass(e, entity.Living) and e.gen_companions:
+                odds, mn, mx = e.gen_companions
+                if random()>odds:
+                    n = randint(mn, mx)
+                    lst = dungeon.empty_lst(loc.adj_locs())[:n]
+                    for loc in lst:
+                        spawn(e, dungeon, engine, loc)
 
 def place_special(room, dungeon, engine, cls):
     for _ in range(50):
@@ -504,7 +516,6 @@ def env(val, max, min=0):
         val = min
     return val
 
-import tcod
 def tunnel_between(start, end):
     x1, y1 = start
     x2, y2 = end

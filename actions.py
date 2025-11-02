@@ -41,10 +41,11 @@ class MovementAction(DirectionAction):
         ent = self.map.get_blocking_entity_at_loc(loc)
         if ent:
             raise Impossible('Blocked')
+        import entity
         if move:
             self.e1.move(self.mod)
             if self.e1.is_player:
-                items = self.engine.game_map.names_at_loc(self.e1.loc, {self.e1})
+                items = self.engine.game_map.names_at_loc(self.e1.loc, {self.e1, entity.VerticalSpace})
                 if items:
                     self.engine.messages.add(f'You see {items}')
                 for r in self.map.auspicious_rooms():
@@ -64,7 +65,10 @@ class MeleeAction(DirectionAction):
             return
 
         e1 = self.e1
+        e1.wake_up_entities()
         dmg = randint(1, 5) + e1.fighter.power()
+        if e1.is_player:
+            dmg += dmg*(10-e1.strength)
         crit = ''
         if random()>.95:
             crit = ' (critical hit)'

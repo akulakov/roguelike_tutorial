@@ -50,6 +50,8 @@ class Loc:
         return f'<{self.x},{self.y}>'
 
     def __eq__(self, o):
+        # doesn't work for opening doors???
+        # return isinstance(o, self.__class__) and o and tuple(self)==tuple(o)
         return o and tuple(self)==tuple(o)
 
     def __hash__(self):

@@ -139,7 +139,6 @@ class Fighter:
         self._defense = defense
         self._power = power
 
-
     def get_mod(self):
         entity = self.entity
         m = entity.engine.game_map
@@ -191,9 +190,9 @@ class Fighter:
         e.color = (191, 0, 0)
         e.blocking = False
         e.is_hostile = False
+        e.is_alive = False
         e.name = f'remains of {self.entity.name}'
         e.render_order = 1
-        print("e.inventory", e.inventory.items)
         for i in e.inventory:
             i.loc = e.loc
             eng.game_map.entities.add(i)
@@ -223,6 +222,7 @@ class Inventory:
     def add(self, item):
         self.items.append(item)
         item.container = self
+        item.entity = self.entity
 
     def drop(self, item):
         self.items.remove(item)

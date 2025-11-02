@@ -12,6 +12,11 @@ from entity_components import Equipment, CharLevel, Inventory, Fighter
 
 YES_NO = 1
 
+class Resistances(Enum):
+    poison = auto()
+    fire = auto()
+    cold = auto()
+
 class Entity:
     is_hostile = False
     game_map = None
@@ -26,7 +31,11 @@ class Entity:
     _inventory = ()
     xp_given = 10
     id = None
-    vloc = None
+    vloc = 0
+    vchar = None
+    levitating = 0
+    asleep = 0
+    poisoned = 0
 
     def __init__(self, engine, x=None, y=None, char=None, color=None, name=None, blocking=False):
         # print("engine", engine)
@@ -84,6 +93,20 @@ class Entity:
 
         return [Loc(*index) for index in path]
 
+    def wake_up_entities(self):
+        #print('in wake_up_entities')
+        lst = self.game_map.entities_within_dist(self.loc, 15)
+        # print("lst", lst)
+        lst = [e for e in lst if e.asleep]
+        # print("lst", lst)
+        if lst:
+            tmp = ', '.join(str(e) for e in lst)
+            self.engine.messages.add(f'Monsters wake up: {tmp}')
+        for e in lst:
+            e.asleep = 0
+
+# END OF ENTITY
+
 class Blocking(Entity):
     blocking = True
 
@@ -96,18 +119,26 @@ class Item(Entity):
     def activate(self):
         pass
 
+class Comestible(Item):
+    pass
+
+class GhostPepper(Comestible):
+    resistance = 0.8, Resistances.fire
+
 class Living(Blocking):
     speed = 1
     is_alive = True
     is_seller = False
     render_order = 3
     gold = 0
+    gen_companions = None
 
     def __init__(self, *a, **kw):
         if self.fighter:
             self.fighter = Fighter(self, *self.fighter)
         super().__init__(*a, **kw)
         self.level = CharLevel(self.engine, self, xp_given=self.xp_given)
+        self.resistances = set()
 
     def hostile_to(self, other):
         return (self.is_hostile and other.is_player) or (self.is_player and other.is_hostile)
@@ -155,12 +186,16 @@ class Hostile(Living):
         if ls:
             if ls.is_usable(self.engine.player):
                 ls.activate()
+                self.wake_up_entities()
                 return
 
         if self.game_map.visible[self.loc.x, self.loc.y]:
             if self.loc.dist(target.loc) <= 1:
+                target.asleep = 0
+                # print(target, "target.asleep", target.asleep)
                 a = MeleeAction(self.loc.dir_to(target.loc))
                 a.init(self.engine, self)
+                self.wake_up_entities()
                 return a
 
             self.path = self.get_path_to(target.loc)
@@ -192,6 +227,7 @@ class Player(Living):
     name = 'Player'
     fighter = 65,12,4
     is_player = True
+    strength  = 10
 
 class Orc(Hostile):
     char = 'o'
@@ -379,8 +415,33 @@ class EyeOfIceScroll(Item):
         self.container.remove(self)
 
 
-class FireballScroll(Item):
-    char = '~'
+class LevitationScroll(Scroll):
+    color = 127, 190, 130
+    name = 'Levitation Scroll'
+    duration = 5
+    base_price = 40
+
+    def activate(self):
+        entity = self.entity
+        self.engine.messages.add(f'The {entity} begins to float in the air!')
+        entity.levitating = self.duration
+        entity.vloc = 1
+        self.container.remove(self)
+
+class SleepScroll(Scroll):
+    color = 117, 190, 130
+    name = 'Sleep Scroll'
+    duration = 5
+    base_price = 50
+
+    def activate(self):
+        entity = self.entity
+        self.engine.messages.add(f'The {entity} falls asleep')
+        entity.asleep = self.duration
+        self.container.remove(self)
+
+
+class FireballScroll(Scroll):
     color = 127, 130, 120
     name = 'Fireball Scroll'
     damage = 6
@@ -562,11 +623,25 @@ class SatyricGoblin(Hostile):
     xp_given = 130
 
 class InsuperableTroll(Troll):
-    """These Trolls are """
     color = 65,105,105
     name = 'Insuperable Troll'
     fighter = 37,14,15
     xp_given = 160
+
+class GiantAnt(Hostile):
+    char = 'a'
+    color = 85,105,105
+    name = 'Giant Ant'
+    fighter = 7,2,2
+    gen_companions = 0.5, 2, 4
+    xp_given = 25
+
+class FireAnt(Hostile):
+    char = 'a'
+    color = 185,105,105
+    name = 'Fire Ant'
+    fighter = 7,3,3
+    xp_given = 45
 
 class Note(Item):
     char = '['
@@ -749,7 +824,10 @@ class Key(Tool):
 class Pickaxe(Tool):
     color = 25, 10, 205
 
-class UndergroundSpace(Entity):
+class VerticalSpace(Entity):
+    pass
+
+class UndergroundSpace(VerticalSpace):
     vloc = -1
     char = ''
     vchar = 'V'
@@ -763,3 +841,5 @@ class UndergroundSpace(Entity):
 special_data = SpecialData()
 # print("special_locs.data", special_data.data, special_data.conversations)
 
+class SingingFrog(Living):
+    pass

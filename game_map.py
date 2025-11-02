@@ -75,13 +75,11 @@ class GameMap:
         up = tuple(up.loc) if up else None
         left = tuple(left.loc) if left else None
         right = tuple(right.loc) if right else None
-        # tiles = json.dumps(self.tiles, cls=NumpyEncoder)
         d = dict(width=self.width, height=self.height, tiles=self.tiles, up=up, left=left, right=right)
         return json.dumps(d, cls=NumpyEncoder)
 
     @staticmethod
     def load(data):
-        # d = data
         d = data = json.loads(data)
         m = GameMap(d['width'], d['height'], set(), 1)
         rows = d['tiles']
@@ -116,16 +114,33 @@ class GameMap:
         return self.left if self.left and loc==self.left.loc else self.right
 
     def render_names_at_location(self, console, loc, r_loc):
-       if not self.in_bounds(loc) or not self.visible[loc.x, loc.y]:
+        if not self.in_bounds(loc) or not self.visible[loc.x, loc.y]:
            return ''
 
-       names = ', '.join( e.name for e in self.entities if e.loc==loc)
-       names = names.capitalize()
-       console.print(x=r_loc.x, y=r_loc.y, string=names)
+        names = ', '.join( e.name for e in self.entities if e.loc==loc)
+        names = names.capitalize()
+        console.print(x=r_loc.x, y=r_loc.y, string=names)
+
+    def entities_within_dist(self, ent_or_loc, dist):
+        loc = getattr(ent_or_loc, 'loc', ent_or_loc)
+        # print('in entities_within_dist', loc)
+        # print(list((e,e.loc) for e in self.entities))
+        lst = [e for e in self.entities if e.loc.dist(loc)<=dist and e.loc!=loc]
+        return lst
 
     def names_at_loc(self, loc, exclude=()):
-       names = ', '.join( e.name for e in self.entities if e.loc==loc and e not in exclude)
-       return names.capitalize()
+        lst = [e for e in self.entities if e.loc==loc and e not in exclude]
+
+        rm = set()
+        for o in exclude:
+           if type(o) is type:
+               for e in lst:
+                   if isinstance(e, o):
+                       rm.add(e)
+        lst = [e for e in lst if e not in rm]
+
+        names = ', '.join( e.name for e in lst if e.loc==loc and e not in exclude)
+        return names.capitalize()
 
     def place(self, item, loc=None):
         self.entities.add(item)
@@ -252,7 +267,7 @@ class GameMap:
         else:
             x = 70
         console.draw_frame(x=x, y=33, width=5, height=9, title=None, clear=True, fg=Color.white, bg=Color.black)
-        console.print(x+2, 38, '@', fg=Color.white)
+        # console.print(x+2, 37 if player.levitating else 38, '@', fg=Color.white)
         console.print(x+1, 39, '---', fg=Color.white)
 
         if loc in (self.left and self.left.loc, self.right and self.right.loc):
@@ -262,9 +277,8 @@ class GameMap:
                 console.print(x+2, y, '=', fg=Color.white)
 
         for e in self.entities:
-            if e.loc==loc and e.vloc:
-                if e.vloc==-1:
-                    console.print(x+2, 40, e.vchar, fg=Color.white)
+            if e.loc==loc:
+                console.print(x+2, 38-e.vloc, e.vchar or e.char, fg=Color.white)
 
 
     def find_walkable(self, loc, dir):

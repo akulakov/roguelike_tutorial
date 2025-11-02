@@ -1,5 +1,5 @@
 import re
-from random import shuffle
+from random import shuffle, randint, random
 import lzma, pickle
 import tcod
 import json
@@ -134,8 +134,29 @@ class Engine:
         self.show_tree()
 
     def handle_enemy_turns(self):
+        for e in self.game_map.entities:
+            if e.levitating:
+                e.levitating -= 1
+                if not e.levitating:
+                    e.vloc = 0
+                    self.messages.add(f'{e} floats down')
+            if e.asleep > 0:
+                e.asleep -= 1
+                if not e.asleep:
+                    self.messages.add(f'{e} wakes up')
+            if e.poisoned > 0:
+                e.poisoned -= 1
+                dmg = randint(2,6)
+                e.fighter.take_damage(dmg)
+                self.messages.add(f'{e} takes {dmg}hp damage from poison')
+                if random()>0.999:
+                    self.messages.add(f'{e} dies of poison')
+                    e.fighter.die()
+                if not e.poisoned and e.is_alive:
+                    self.messages.add(f'{e} feels better')
+
         for e in self.game_map.entities - {self.player}:
-            if e.is_hostile:
+            if e.is_hostile and e.asleep==0:
                 a = e.attack(self.player)
                 if a:
                     try:
@@ -207,6 +228,7 @@ def new_game(maps_filename):
     player.inventory.add(entity.Abacus(engine, entity=player))
     player.inventory.add(entity.Key(engine, entity=player))
     player.inventory.add(entity.LightningScroll(engine))
+    player.inventory.add(entity.LevitationScroll(engine))
     player.inventory.add(entity.AuspiciousRoomScroll(engine))
     player.inventory.add(entity.MagicMissileScroll(engine))
     player.inventory.add(entity.Pickaxe(engine, entity=player))
@@ -245,4 +267,5 @@ def load_game(filename, maps_filename):
     with open(maps_filename, 'r') as f:
         engine.custom_maps = engine.load_custom_maps(json.loads(f.read()))
         print("engine.custom_maps", list(engine.custom_maps))
+    engine.player.poisoned = 3
     return engine
