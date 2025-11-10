@@ -1,12 +1,14 @@
 
 class Equipment:
-    entity = None
+    entity = ring1 = ring2 = None
 
-    def __init__(self, entity, weapon=None, armor=None, tool=None):
+    def __init__(self, entity, weapon=None, armor=None, tool=None, ring1=None, ring2=None):
         self.entity = entity
         self.weapon = weapon
         self.armor = armor
         self.tool = tool
+        self.ring1 = ring1
+        self.ring2 = ring2
 
     @property
     def defense_bonus(self):
@@ -17,24 +19,37 @@ class Equipment:
             bonus += self.armor.defense_bonus
         if self.tool:
             bonus += self.tool.defense_bonus
+        if self.ring1:
+            bonus += self.ring1.defense_bonus
+        if self.ring2:
+            bonus += self.ring2.defense_bonus
         return bonus
 
     def fully_equipped(self):
-        return self.weapon and self.armor and self.tool
+        return self.weapon and self.armor and self.tool and self.ring1 and self.ring2
 
     @property
     def power_bonus(self):
         bonus = 0
         if self.weapon:
-            bonus += self.weapon.power_bonus
+            b = self.weapon.power_bonus
+            bm = b*self.weapon.damaged_mod
+            if b==bm:
+                bm-= 1
+
+            bonus += bm
         if self.armor:
             bonus += self.armor.power_bonus
         if self.tool:
             bonus += self.tool.power_bonus
+        if self.ring1:
+            bonus += self.ring1.power_bonus
+        if self.ring2:
+            bonus += self.ring2.power_bonus
         return bonus
 
     def item_is_equipped(self, item):
-        return self.weapon == item or self.armor == item or self.tool==item
+        return item in (self.weapon, self.armor, self.tool, self.ring1, self.ring2)
 
     def unequip_message(self, item_name):
         self.entity.engine.messages.add(f'{self.entity} removes the {item_name}.')
@@ -61,15 +76,17 @@ class Equipment:
         setattr(self, slot, None)
 
     def get_slot(self, item):
-        from entity import Weapon, Armor
+        from entity import Weapon, Armor, Tool, Ring
         if isinstance(item, Weapon):
             return 'weapon'
         if isinstance(item, Armor):
             return 'armor'
-        else:
+        if isinstance(item, Tool):
             return 'tool'
+        if isinstance(item, Ring):
+            return 'ring1'
 
-    def slot_available(self, item=None, slot=None, ):
+    def slot_available(self, item=None, slot=None):
         slot = slot or self.get_slot(item)
         return not getattr(self, slot)
 

@@ -35,7 +35,9 @@ class Entity:
     vchar = None
     levitating = 0
     asleep = 0
+    paralized = 0
     poisoned = 0
+    turning_to_stone = 0
 
     def __init__(self, engine, x=None, y=None, char=None, color=None, name=None, blocking=False):
         # print("engine", engine)
@@ -143,6 +145,9 @@ class Living(Blocking):
     def hostile_to(self, other):
         return (self.is_hostile and other.is_player) or (self.is_player and other.is_hostile)
 
+    def on_attack(self, entity):
+        pass
+
 class Hostile(Living):
     is_hostile = True
     path = None
@@ -196,6 +201,7 @@ class Hostile(Living):
                 a = MeleeAction(self.loc.dir_to(target.loc))
                 a.init(self.engine, self)
                 self.wake_up_entities()
+                self.on_attack(target)
                 return a
 
             self.path = self.get_path_to(target.loc)
@@ -235,10 +241,30 @@ class Orc(Hostile):
     name = 'Orc'
     fighter = 10,1,2
 
+class AcidBlob(Hostile):
+    char = 'b'
+    color = 63, 63, 63
+    name = 'Acid Blob'
+    fighter = 10,2,2
+
+    def on_attack(self, entity):
+        pass
+
+class Chicatrice(Hostile):
+    char = 'c'
+    color = 63, 163, 63
+    fighter = 12,3,3
+
+    def on_attack(self, entity):
+        e = entity
+        if random()<.33:
+            self.engine.messages.add(f'Chicatrice hisses at {e}')
+            if random()>.9:
+                e.turning_to_stone = 5
+
 class Troll(Hostile):
     char = 'T'
     color = 0,127,0
-    name = 'Troll'
     fighter = 15,2,2
 
 class HealthPotion(HealingItem):
@@ -488,10 +514,18 @@ class Equippable(Item):
 
 class Weapon(Equippable):
     char = ')'
+    damaged_mod = 1
+
+    def damage(self):
+        if not self.damaged_mod:
+            self.damaged_mod = 0.8
+
 class Armor(Equippable):
     char = '['
 class Tool(Equippable):
     char = ']'
+class Ring(Equippable):
+    char = '='
 
 class Box(Item):
     char = ']'
@@ -502,6 +536,10 @@ class Box(Item):
         self.inventory = Inventory(engine, self, 20)
         self.locked = random()>.05
         super().__init__(engine, *a, **kw)
+
+class RingOfFreeAction(Ring):
+    color = 0, 95, 225
+    base_price = 100
 
 class Broom(Tool):
     color = 0, 95, 225

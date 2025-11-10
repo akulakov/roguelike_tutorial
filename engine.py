@@ -134,16 +134,23 @@ class Engine:
         self.show_tree()
 
     def handle_enemy_turns(self):
-        for e in self.game_map.entities:
+        for e in self.game_map.entities.copy():
             if e.levitating:
                 e.levitating -= 1
                 if not e.levitating:
                     e.vloc = 0
                     self.messages.add(f'{e} floats down')
+
             if e.asleep > 0:
                 e.asleep -= 1
                 if not e.asleep:
                     self.messages.add(f'{e} wakes up')
+
+            if e.paralized > 0:
+                e.paralized -= 1
+                if not e.paralized:
+                    self.messages.add(f'{e} can move again')
+
             if e.poisoned > 0:
                 e.poisoned -= 1
                 dmg = randint(2,6)
@@ -155,8 +162,16 @@ class Engine:
                 if not e.poisoned and e.is_alive:
                     self.messages.add(f'{e} feels better')
 
+            if e.turning_to_stone > 0:
+                e.turning_to_stone -= 1
+                if e.turning_to_stone:
+                    self.messages.add(f'{e} is turning to stone ...')
+                else:
+                    self.messages.add(f'{e} is now STONE ...')
+                    e.fighter.die()
+
         for e in self.game_map.entities - {self.player}:
-            if e.is_hostile and e.asleep==0:
+            if e.is_hostile and e.asleep==0 and e.paralized==0:
                 a = e.attack(self.player)
                 if a:
                     try:
@@ -267,5 +282,7 @@ def load_game(filename, maps_filename):
     with open(maps_filename, 'r') as f:
         engine.custom_maps = engine.load_custom_maps(json.loads(f.read()))
         print("engine.custom_maps", list(engine.custom_maps))
-    engine.player.poisoned = 3
+    # engine.player.paralized = 3
+    p = engine.player
+    p.inventory.add(entity.RingOfFreeAction(engine, entity=p))
     return engine

@@ -59,8 +59,16 @@ class EventHandler(tcod.event.EventDispatch):
         self.go = False
         import entity
 
-        if self.player.asleep>0:
-            engine.messages.add('You are asleep')
+        if key == keys.ESCAPE:
+            engine.context = None  # tcod context cannot be pickled
+            engine.game_map.cursor = None   # EDITOR cursor
+            self.save_game('game.sav', 'custom_maps.dat')
+            raise SystemExit()
+
+        if not self.player.is_alive:
+            return WaitAction()
+        if self.player.asleep>0 or self.player.paralized>0:
+            engine.messages.add('You are unable to move')
             return WaitAction()
 
         if key == keys.g:
@@ -198,12 +206,6 @@ class EventHandler(tcod.event.EventDispatch):
 
         if action:
             action.init(engine, self.player)
-
-        if key == keys.ESCAPE:
-            engine.context = None  # tcod context cannot be pickled
-            engine.game_map.cursor = None   # EDITOR cursor
-            self.save_game('game.sav', 'custom_maps.dat')
-            raise SystemExit()
 
         if self.player.level.requires_level_up:
             engine.event_handler = LevelUpEventHandler(engine)
