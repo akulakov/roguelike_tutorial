@@ -1,3 +1,4 @@
+from random import random
 
 class Equipment:
     entity = ring1 = ring2 = None
@@ -250,7 +251,18 @@ class Inventory:
     def remove(self, item):
         self.items.remove(item)
 
-    def get(self, cls):
-        ls = [i for i in self if isinstance(i, cls)]
+    def get_list(self, cls):
+        return [i for i in self if isinstance(i, cls)]
+
+    def get_one(self, cls):
+        ls = self.get_list(cls)
         if ls:
             return ls[0]
+
+    def take_damage(self, type):
+        from entity import DamageType, Potion
+        if type == DamageType.cold:
+            for p in self.get_list(Potion):
+                if random()>.9:
+                    self.entity.engine.add(f'Blast of cold breaks {p}')
+                    self.remove(p)

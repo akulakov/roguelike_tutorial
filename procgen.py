@@ -141,7 +141,7 @@ item_chances = {
 }
 
 enemy_chances = {
-   0: [(E.Orc, 20), (E.Chicatrice, 80)],
+   0: [(E.Orc, 20), (E.WinterWolf, 80)],
    3: [(E.BroomTroll, 85)],
    5: [(E.Troll, 30)],
    7: [(E.Troll, 60)],

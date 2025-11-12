@@ -135,6 +135,8 @@ class Engine:
 
     def handle_enemy_turns(self):
         for e in self.game_map.entities.copy():
+            if not isinstance(e, entity.Living):
+                continue
             if e.levitating:
                 e.levitating -= 1
                 if not e.levitating:
@@ -145,6 +147,11 @@ class Engine:
                 e.asleep -= 1
                 if not e.asleep:
                     self.messages.add(f'{e} wakes up')
+
+            if e.blinded > 0:
+                e.blinded -= 1
+                if not e.blinded:
+                    self.messages.add(f'{e} can see again')
 
             if e.paralized > 0:
                 e.paralized -= 1
@@ -282,7 +289,7 @@ def load_game(filename, maps_filename):
     with open(maps_filename, 'r') as f:
         engine.custom_maps = engine.load_custom_maps(json.loads(f.read()))
         print("engine.custom_maps", list(engine.custom_maps))
-    # engine.player.paralized = 3
+    # engine.player.blinded = 3
     p = engine.player
     p.inventory.add(entity.RingOfFreeAction(engine, entity=p))
     return engine

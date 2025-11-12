@@ -2,7 +2,7 @@ from collections import defaultdict
 import time
 from enum import Enum, auto
 import tcod
-from random import choice, random
+from random import choice, random, randint
 import input_handlers
 import numpy as np
 from util import Loc
@@ -16,6 +16,11 @@ class Resistances(Enum):
     poison = auto()
     fire = auto()
     cold = auto()
+
+class DamageType(Enum):
+    fire = auto()
+    cold = auto()
+    concussive = auto()
 
 class Entity:
     is_hostile = False
@@ -33,11 +38,6 @@ class Entity:
     id = None
     vloc = 0
     vchar = None
-    levitating = 0
-    asleep = 0
-    paralized = 0
-    poisoned = 0
-    turning_to_stone = 0
 
     def __init__(self, engine, x=None, y=None, char=None, color=None, name=None, blocking=False):
         # print("engine", engine)
@@ -99,7 +99,7 @@ class Entity:
         #print('in wake_up_entities')
         lst = self.game_map.entities_within_dist(self.loc, 15)
         # print("lst", lst)
-        lst = [e for e in lst if e.asleep]
+        lst = [e for e in lst if isinstance(e, Living) and e.asleep]
         # print("lst", lst)
         if lst:
             tmp = ', '.join(str(e) for e in lst)
@@ -134,6 +134,13 @@ class Living(Blocking):
     render_order = 3
     gold = 0
     gen_companions = None
+    levitating = 0
+    asleep = 0
+    paralized = 0
+    poisoned = 0
+    turning_to_stone = 0
+    blinded = 0
+    damage_type = None
 
     def __init__(self, *a, **kw):
         if self.fighter:
@@ -147,6 +154,9 @@ class Living(Blocking):
 
     def on_attack(self, entity):
         pass
+
+    def take_damage(self, amount, type=None):
+        self.fighter.take_damage(amount)
 
 class Hostile(Living):
     is_hostile = True
@@ -187,7 +197,7 @@ class Hostile(Living):
                 self.engine.messages.add(f"The {self} is no longer confused.")
             return a
 
-        ls = self.inventory.get(LightningScroll)
+        ls = self.inventory.get_one(LightningScroll)
         if ls:
             if ls.is_usable(self.engine.player):
                 ls.activate()
@@ -197,7 +207,7 @@ class Hostile(Living):
         if self.game_map.visible[self.loc.x, self.loc.y]:
             if self.loc.dist(target.loc) <= 1:
                 target.asleep = 0
-                # print(target, "target.asleep", target.asleep)
+                # todo: use monster's damage type
                 a = MeleeAction(self.loc.dir_to(target.loc))
                 a.init(self.engine, self)
                 self.wake_up_entities()
@@ -262,13 +272,25 @@ class Chicatrice(Hostile):
             if random()>.9:
                 e.turning_to_stone = 5
 
+class Pyrolisk(Hostile):
+    char = 'c'
+    color = 163, 63, 63
+    fighter = 12,4,3
+
+    def on_attack(self, entity):
+        e = entity
+        if not self.blinded and not e.blinded:
+            e.take_damage(randint(5,10))
+
 class Troll(Hostile):
     char = 'T'
     color = 0,127,0
     fighter = 15,2,2
 
-class HealthPotion(HealingItem):
+class Potion(Item):
     char = '!'
+
+class HealthPotion(Potion, HealingItem):
     color = 127,0,255
     name = 'Health Potion'
     amount = 4
@@ -322,7 +344,7 @@ class MagicMissileScroll(Scroll):
             time.sleep(0.1)
 
             for e in list(map.get_all_living_at_loc(loc)):
-                e.fighter.take_damage(self.damage)
+                e.take_damage(self.damage)
                 self.engine.messages.add(f'{e} suffers {self.damage} damage')
         self.engine.player.inventory.remove(self)
 
@@ -357,7 +379,7 @@ class LightningScroll(Scroll):
 
         if target:
             self.engine.messages.add(f'A lighting bolt strikes the {target.name} with a loud thunder, for {self.damage} damage!')
-            target.fighter.take_damage(self.damage)
+            target.take_damage(self.damage)
             self.container.remove(self)
         else:
             raise Impossible('No enemy is close enough to strike.')
@@ -403,7 +425,7 @@ class DoorOnFireScroll(Item):
         b = map.get_living_at_locs(r.center.adj_locs(include_self=True))
         b = set(b) - {e1}
         for e in b:
-            e.fighter.take_damage(self.damage)
+            e.take_damage(self.damage)
         if len(b)==1:
             self.engine.messages.add(f'{b[0]} was struck by {self.name}.')
         elif len(b)==0:
@@ -431,7 +453,7 @@ class EyeOfIceScroll(Item):
         b = map.get_living_at_locs(r.center.adj_locs(include_self=True))
         b = set(b) - {e1}
         for e in b:
-            e.fighter.take_damage(self.damage)
+            e.take_damage(self.damage)
         if len(b)==1:
             self.engine.messages.add(f'{b[0]} was struck by Eye of Ice.' % len(b))
         elif len(b)==0:
@@ -486,7 +508,7 @@ class FireballScroll(Scroll):
         for being in self.game_map.living():
             if being.loc.dist(Loc(*target_xy)) <= self.radius:
                 self.engine.messages.add( f'The {being} is engulfed in a fiery explosion, taking {self.damage} damage!')
-                being.fighter.take_damage(self.damage)
+                being.take_damage(self.damage)
                 targets_hit = True
 
         if not targets_hit:
@@ -680,6 +702,28 @@ class FireAnt(Hostile):
     name = 'Fire Ant'
     fighter = 7,3,3
     xp_given = 45
+
+class Wolf(Hostile):
+    char = 'd'
+    color = 185,125,115
+    fighter = 8,4,4
+    xp_given = 60
+
+class WinterWolf(Wolf):
+    color = 115,115,115
+    xp_given = 90
+    damage_type = DamageType.cold
+
+class WereWolf(Wolf):
+    char = man_char = '@'
+    animal_char = 'd'
+    fighter = man_form_fighter = 9,6,6
+    wolf_form_fighter = 10,7,7
+    change_duration = 15
+    xp_given = 120
+
+    def turn_animal(self):
+        self.char = self.animal_char
 
 class Note(Item):
     char = '['

@@ -154,7 +154,7 @@ class EventHandler(tcod.event.EventDispatch):
             if box:
                 ok = False
                 if box.locked:
-                    k = self.player.inventory.get(entity.Key)
+                    k = self.player.inventory.get_one(entity.Key)
                     if k:
                         box.locked = False
                         self.player.inventory.remove(k)
@@ -170,7 +170,7 @@ class EventHandler(tcod.event.EventDispatch):
                     door = self.game_map.entity(l, entity.Door)
                     if door:
                         if door.locked:
-                            k = self.player.inventory.get(entity.Key)
+                            k = self.player.inventory.get_one(entity.Key)
                             if k:
                                 door.locked = False
                                 self.player.inventory.remove(k)

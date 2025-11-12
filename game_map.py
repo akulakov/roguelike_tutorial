@@ -233,9 +233,10 @@ class GameMap:
             default=tile_types.SHROUD
         )
 
-        for entity in sorted( self.entities, key=lambda x: x.render_order):
+        player = engine.player
+        for entity in sorted(self.entities, key=lambda x: x.render_order):
             loc = entity.loc
-            if self.visible[loc.x, loc.y]:
+            if self.visible[loc.x, loc.y] and not player.blinded:
                 console.print(x=loc.x, y=loc.y, string=entity.char, fg=entity.color)
 
         f = engine.player.fighter
