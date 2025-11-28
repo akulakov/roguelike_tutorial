@@ -123,8 +123,6 @@ class GameMap:
 
     def entities_within_dist(self, ent_or_loc, dist):
         loc = getattr(ent_or_loc, 'loc', ent_or_loc)
-        # print('in entities_within_dist', loc)
-        # print(list((e,e.loc) for e in self.entities))
         lst = [e for e in self.entities if e.loc.dist(loc)<=dist and e.loc!=loc]
         return lst
 
@@ -223,6 +221,13 @@ class GameMap:
         if self.get_blocking_entity_at_loc(loc):
             return False
         return True
+
+    def to_locs(self, lst):
+        return [Loc(*l) for l in lst]
+
+    def empty_adj(self, loc):
+        locs = self.to_locs(loc.adj())
+        return [l for l in locs if self.empty(l)]
 
     def render(self, engine, console):
         if self.reveal:

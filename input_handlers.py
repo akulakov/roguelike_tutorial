@@ -65,9 +65,10 @@ class EventHandler(tcod.event.EventDispatch):
             self.save_game('game.sav', 'custom_maps.dat')
             raise SystemExit()
 
-        if not self.player.is_alive:
+        player = self.player
+        if not player.is_alive or player.ap<1:
             return WaitAction()
-        if self.player.asleep>0 or self.player.paralized>0:
+        if player.asleep>0 or player.paralized>0:
             engine.messages.add('You are unable to move')
             return WaitAction()
 
@@ -183,6 +184,13 @@ class EventHandler(tcod.event.EventDispatch):
 
         elif key == keys.SLASH:
             self.engine.event_handler = LookHandler(self.engine)
+        elif key == keys.z:
+            e = self.engine.game_map.entities
+            print("id(e)", id(e))
+            e = [o for o in e if isinstance(o, entity.Living)]
+            for o in e:
+                print(o, o.loc, o.asleep)
+
         elif key == keys.COMMA:
             l = engine.game_map.get_entities_at_loc(self.engine.player.loc)
             l = [i for i in l if isinstance(i, entity.Item)]
@@ -206,6 +214,7 @@ class EventHandler(tcod.event.EventDispatch):
 
         if action:
             action.init(engine, self.player)
+            player.ap -= 1
 
         if self.player.level.requires_level_up:
             engine.event_handler = LevelUpEventHandler(engine)

@@ -13,6 +13,13 @@ from procgen import generate_dungeon, generate_special_dungeon
 from input_handlers import EventHandler, MainMenu
 import libtcodpy
 
+"""
+TODO
+fast move stop -- check on both sides of corridor.
+fast move stop before water.
+some monsters are still not in `entities`.
+"""
+
 screen_width = 80
 screen_height = 50
 
@@ -24,6 +31,8 @@ class Engine:
     event_handler = None
     total_levels = 0
     max_levels = 25
+    screen_width = screen_width
+    screen_height = screen_height
 
     def __init__(self, player):
         self.player = player
@@ -133,7 +142,15 @@ class Engine:
         self.cur_node = self.cur_node.parent
         self.show_tree()
 
+    # for e in self.game_map.entities - {self.player}:
+
     def handle_enemy_turns(self):
+        if self.player.ap >= 1:
+            return
+        for e in self.game_map.entities:
+            if isinstance(e, entity.Living):
+                e.ap += e.speed
+
         for e in self.game_map.entities.copy():
             if not isinstance(e, entity.Living):
                 continue
@@ -178,13 +195,16 @@ class Engine:
                     e.fighter.die()
 
         for e in self.game_map.entities - {self.player}:
-            if e.is_hostile and e.asleep==0 and e.paralized==0:
-                a = e.attack(self.player)
-                if a:
-                    try:
-                        a.perform()
-                    except Impossible:
-                        pass
+            for _ in range(3):
+                if e.is_hostile and e.asleep==0 and e.paralized==0 and e.ap>=1:
+                    a = e.attack(self.player)
+                    if a:
+                        try:
+                            a.perform()
+                        except Impossible:
+                            pass
+                if isinstance(e, entity.Living) and e.ap>=1:
+                    e.ap = max(0, e.ap-1)
 
     def update_fov(self):
         """Recompute the visible area based on the players point of view."""

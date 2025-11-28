@@ -149,6 +149,21 @@ class CharLevel:
         self.increase_level()
 
 
+class Magic:
+    def __init__(self, entity, mana, resistance, power):
+        self.entity = entity
+        self.max_mana = self._mana = mana
+        self.resistance = resistance
+        self.power = power
+
+    @property
+    def mana(self):
+        return self._mana
+
+    @mana.setter
+    def mana(self, value):
+        self._mana = max(0, min(value, self.max_mana))
+
 class Fighter:
     def __init__(self, entity, hp, defense, power):
         self.entity = entity
@@ -178,9 +193,12 @@ class Fighter:
 
     @hp.setter
     def hp(self, value):
+        old = self._hp
         self._hp = max(0, min(value, self.max_hp))
         if not self._hp:
             self.die()
+        if self._hp!=old:
+            return True
 
     def heal(self, amount):
         if self.hp == self.max_hp:
@@ -191,10 +209,11 @@ class Fighter:
         self.hp = hp
         return healed
 
-    def take_damage(self, amount):
+    def take_damage(self, amount, type=None):
         self.hp -= amount
 
     def die(self):
+        self.entity.on_death()
         eng = self.entity.engine
         if eng.player is self.entity:
             death_message = 'You died!'
@@ -260,7 +279,7 @@ class Inventory:
             return ls[0]
 
     def take_damage(self, type):
-        from entity import DamageType, Potion
+        from entity import DamageType, Potion, Ring, Wand
         if type == DamageType.cold:
             for p in self.get_list(Potion):
                 if random()>.9:

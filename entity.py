@@ -21,6 +21,8 @@ class DamageType(Enum):
     fire = auto()
     cold = auto()
     concussive = auto()
+    shock = auto()
+    magic = auto()
 
 class Entity:
     is_hostile = False
@@ -75,9 +77,10 @@ class Entity:
 
     def get_path_to(self, loc):
         """Compute and return a path to the target position or empty list."""
-        cost = np.array(self.game_map.tiles["walkable"], dtype=np.int8)
+        game_map = self.engine.game_map
+        cost = np.array(game_map.tiles["walkable"], dtype=np.int8)
 
-        for entity in self.game_map.entities:
+        for entity in game_map.entities:
             eloc = entity.loc
             if entity.blocking and cost[eloc.x, eloc.y]:
                 # Add to the cost of a blocked position.  A lower number means more enemies will crowd behind each other
@@ -96,11 +99,9 @@ class Entity:
         return [Loc(*index) for index in path]
 
     def wake_up_entities(self):
-        #print('in wake_up_entities')
-        lst = self.game_map.entities_within_dist(self.loc, 15)
-        # print("lst", lst)
+        game_map = self.engine.game_map
+        lst = game_map.entities_within_dist(self.loc, 15)
         lst = [e for e in lst if isinstance(e, Living) and e.asleep]
-        # print("lst", lst)
         if lst:
             tmp = ', '.join(str(e) for e in lst)
             self.engine.messages.add(f'Monsters wake up: {tmp}')
@@ -141,13 +142,14 @@ class Living(Blocking):
     turning_to_stone = 0
     blinded = 0
     damage_type = None
+    ap = 0  # action points
 
     def __init__(self, *a, **kw):
         if self.fighter:
             self.fighter = Fighter(self, *self.fighter)
         super().__init__(*a, **kw)
         self.level = CharLevel(self.engine, self, xp_given=self.xp_given)
-        self.resistances = set()
+        self.resistances = dict()
 
     def hostile_to(self, other):
         return (self.is_hostile and other.is_player) or (self.is_player and other.is_hostile)
@@ -157,6 +159,12 @@ class Living(Blocking):
 
     def take_damage(self, amount, type=None):
         self.fighter.take_damage(amount)
+
+    def on_death(self):
+        pass
+
+    def pre_move(self):
+        pass
 
 class Hostile(Living):
     is_hostile = True
@@ -185,9 +193,19 @@ class Hostile(Living):
                         break
 
     def attack(self, target):
+        if not self.speed:
+            return
+        if self.pre_move():
+            return
+
+        # e.g. gas spore
+        if not self.fighter._power:
+            return
+
         if self.handle_pickup():
             return
         self.handle_equipment()
+
         if self.confused:
             mod = Loc(*choice(list(input_handlers.dir_keys.values())))
             a = BumpAction(mod)
@@ -237,6 +255,10 @@ class HealingItem(Item):
             elif e is self.engine.player:
                 raise Impossible("Your health is already full.")
 
+class Water(Item):
+    char = '~'
+    color = 25, 30, 205
+
 class Player(Living):
     char = '@'
     color = 255,255,255
@@ -248,8 +270,34 @@ class Player(Living):
 class Orc(Hostile):
     char = 'o'
     color = 63, 127, 63
-    name = 'Orc'
     fighter = 10,1,2
+
+class Gremlin(Hostile):
+    char = 'g'
+    color = 63, 127, 83
+    fighter = 15,4,4
+    speed = 0.75
+
+    def pre_move(self):
+        m = self.engine.game_map
+        if m.entity(self.loc, Water) and self.fighter._hp>1 and random()>.5:
+            lst = m.empty_adj(self.loc)
+            if lst:
+                from procgen import spawn
+                g = spawn(Gremlin, m, self.engine, lst[0])
+                self.fighter._hp = g._hp = self.fighter._hp // 2
+                return True
+
+class GasSpore(Hostile):
+    char = 'e'
+    color = 63, 127, 63
+    name = 'Gas Spore'
+    fighter = 10,0,0
+
+    def on_death(self):
+        eng = self.engine
+        # locs = self.loc.rect(eng.screen_width, eng.screen_height, 7, 7)
+
 
 class AcidBlob(Hostile):
     char = 'b'
@@ -344,9 +392,19 @@ class MagicMissileScroll(Scroll):
             time.sleep(0.1)
 
             for e in list(map.get_all_living_at_loc(loc)):
-                e.take_damage(self.damage)
+                e.take_damage(self.damage, DamageType.magic)
                 self.engine.messages.add(f'{e} suffers {self.damage} damage')
         self.engine.player.inventory.remove(self)
+
+class Spell:
+    pass
+
+class CureSelf(Spell):
+    hp = 5
+    mana = 5
+
+    def activate(self):
+        self.fighter.hp += self.hp
 
 class LightningScroll(Scroll):
     color = 127,25,155
@@ -548,6 +606,8 @@ class Tool(Equippable):
     char = ']'
 class Ring(Equippable):
     char = '='
+class Wand(Item):
+    char = '/'
 
 class Box(Item):
     char = ']'

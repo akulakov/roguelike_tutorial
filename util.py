@@ -12,6 +12,20 @@ class Loc:
     def __lt__(self, o):
         return tuple(self) < tuple(o)
 
+    def rect(self, max_x, max_y, width, height):
+        l = []
+        hh = height/2
+        hw = width/2
+        x,y = self.x, self.y
+        st_x = max(0, x-hw)
+        st_y = max(0, y-hh)
+        end_x = min(max_x, x+hw)
+        end_y = min(max_y, y+hh)
+        def row(y):
+            return [Loc(x,y) for x in range(st_x, end_x+1)]
+        l = [row(y) for y in range(st_y, end_y+1)]
+        return l
+
     def adj(self):
         x,y=self
         return set([(x+1,y),(x-1,y),(x,y+1),(x,y-1), (x+1,y+1), (x-1,y-1), (x+1,y-1), (x-1,y+1)])

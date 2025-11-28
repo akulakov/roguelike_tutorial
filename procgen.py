@@ -130,6 +130,10 @@ def spawn(type, dungeon, engine, loc):
         for i in items:
             if i not in (entity.Box, entity.UndergroundSpace):
                 m.inventory.add(i(engine))
+    if isinstance(m, entity.Living):
+        if m.asleep:
+            print('in spawn, m, m.loc, m.asleep', m, m.loc, m.asleep)
+    return m
 
 E = entity
 item_chances = {
@@ -141,7 +145,7 @@ item_chances = {
 }
 
 enemy_chances = {
-   0: [(E.Orc, 20), (E.WinterWolf, 80)],
+   0: [(E.Orc, 20), (E.Gremlin, 80)],
    3: [(E.BroomTroll, 85)],
    5: [(E.Troll, 30)],
    7: [(E.Troll, 60)],
@@ -173,6 +177,11 @@ def get_entities_at_random(weighted_chances_by_floor, number_of_entities, floor)
 def place_entities(room, dungeon, engine):
     monsters = get_entities_at_random(enemy_chances, randint(0,2), engine.level)
     items = get_entities_at_random(item_chances, randint(0,2), engine.level)
+    from entity import Water
+
+    if random()>.9:
+        loc = Loc( randint(room.x1 + 1, room.x2 - 1), randint(room.y1 + 1, room.y2 - 1) )
+        spawn(Water, dungeon, engine, loc)
 
     for e in monsters + items:
         loc = Loc( randint(room.x1 + 1, room.x2 - 1), randint(room.y1 + 1, room.y2 - 1) )
