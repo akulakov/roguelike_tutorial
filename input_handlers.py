@@ -745,10 +745,11 @@ class KickHandler(EventHandler):
                 ent = self.engine.game_map.entity(loc, (Door, Box))
                 dmg = 0
                 if ent:
-                    if random()>.5:
-                        self.engine.messages.add(f'{ent.__class__.__name__} holds')
+                    # make it easier to kick (single key)
+                    #if random()>.1:
+                    #    self.engine.messages.add(f'{ent.__class__.__name__} holds')
 
-                    elif isinstance(ent, Door):
+                    if isinstance(ent, Door):
                         self.engine.messages.add('Door breaks')
                         self.engine.game_map.entities.remove(ent)
                         if random()>.6:

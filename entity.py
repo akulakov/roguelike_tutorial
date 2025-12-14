@@ -10,6 +10,14 @@ from actions import WaitAction, MovementAction, MeleeAction, Impossible, BumpAct
 from game_map import Color
 from entity_components import Equipment, CharLevel, Inventory, Fighter
 
+"""
+TODO
+fast move stop -- check on both sides of corridor.
+fast move stop before water.
+some monsters are still not in `entities`.
+make leprechauns hostile but "run away"
+"""
+
 YES_NO = 1
 
 class Resistances(Enum):
@@ -40,6 +48,8 @@ class Entity:
     id = None
     vloc = 0
     vchar = None
+    char = ''
+    color = None
 
     def __init__(self, engine, x=None, y=None, char=None, color=None, name=None, blocking=False):
         # print("engine", engine)
@@ -71,6 +81,9 @@ class Entity:
 
     def __repr__(self):
         return self.name
+
+    def __str__(self):
+        return self.char
 
     def move(self, mod):
         self.loc += mod
@@ -143,6 +156,9 @@ class Living(Blocking):
     blinded = 0
     damage_type = None
     ap = 0  # action points
+    spells = None
+    haste_spell = None
+    special_attack = None
 
     def __init__(self, *a, **kw):
         if self.fighter:
@@ -222,8 +238,19 @@ class Hostile(Living):
                 self.wake_up_entities()
                 return
 
+        if self.spells:
+            if self.fighter.hp<self.fighter.max_hp and HealSelf in self.spells and random()>.6:
+                HealSelf(self).activate()
+                return
+            if HasteSelf in self.spells and not self.haste_spell and random()>.35:
+                HasteSelf(self).activate()
+                return
+
         if self.game_map.visible[self.loc.x, self.loc.y]:
             if self.loc.dist(target.loc) <= 1:
+                if self.special_attack:
+                    if self.special_attack(target):
+                        return WaitAction()
                 target.asleep = 0
                 # todo: use monster's damage type
                 a = MeleeAction(self.loc.dir_to(target.loc))
@@ -232,15 +259,19 @@ class Hostile(Living):
                 self.on_attack(target)
                 return a
 
-            self.path = self.get_path_to(target.loc)
-
-        if self.path:
-            loc = self.path.pop(0)
-            a = MovementAction(self.loc.dir_to(loc))
-            a.init(self.engine, self)
+        a = self.attack_path(target)
+        if a:
             return a
 
         return WaitAction()
+
+    def attack_path(self, target):
+        if self.game_map.visible[self.loc.x, self.loc.y]:
+            path = self.get_path_to(target.loc)
+            loc = path.pop(0)
+            a = MovementAction(self.loc.dir_to(loc))
+            a.init(self.engine, self)
+            return a
 
 class HealingItem(Item):
     def activate(self):
@@ -254,6 +285,33 @@ class HealingItem(Item):
                     Color.health_recovered)
             elif e is self.engine.player:
                 raise Impossible("Your health is already full.")
+
+class Spell:
+    def __init__(self, entity):
+        self.entity = entity
+
+class HealSelf(Spell):
+    hp = 5
+    mana = 5
+
+    def activate(self):
+        fighter = self.entity.fighter
+        old = fighter.hp
+        fighter.hp += self.hp
+        if old != fighter.hp:
+            self.entity.engine.messages.add(f'{self.entity} looks healthier')
+
+class HasteSelf(Spell):
+    """Now only applies to monsters, with player there would have to be a countdown added."""
+    mod = 0.1
+    mana = 5
+
+    def activate(self):
+        print('in HasteSelf.activate')
+        entity = self.entity
+        entity.speed += self.mod
+        entity.engine.messages.add(f'{entity} looks like there is more spring in his step')
+        entity.haste_spell = True
 
 class Water(Item):
     char = '~'
@@ -271,6 +329,41 @@ class Orc(Hostile):
     char = 'o'
     color = 63, 127, 63
     fighter = 10,1,2
+
+class Mimic(Hostile):
+    char = 'm'
+    color = 63, 107, 163
+    speed = 0.66
+    fighter = 25,4,4
+    revealed = False
+    _char = _color = None
+
+    def __str__(self):
+        if not self._char or not self._color:
+            self._char, self._color = choice(list(special_data.items.values()))
+        return self.char if self.revealed else self._char
+
+class Leprechaun(Hostile):
+    char = 'l'
+    color = 63, 127, 63
+    fighter = 8,3,3
+    speed = 1.1
+
+    def special_attack(self, target):
+        if target.gold:
+            g = min(target.gold, randint(5,150))
+            self.gold += g
+            target.gold -= g
+            self.engine.messages.add(f"{self} brushes his hand over {target}'s pocket")
+            self.is_hostile = False
+            return True
+
+class KoboldShaman(Hostile):
+    char = 'k'
+    color = 163, 147, 63
+    fighter = 20,3,3
+    spells = [HealSelf, HasteSelf]
+    name = 'Kobold Shaman'
 
 class Gremlin(Hostile):
     char = 'g'
@@ -355,7 +448,6 @@ class AuspiciousRoomScroll(Item):
         r.auspicious = 30
         self.container.remove(self)
         self.engine.messages.add('You feel like there is a good place for you somewhere on this level of caves')
-        print("r auspicious", r, r.auspicious)
 
 
 class Scroll(Item):
@@ -395,16 +487,6 @@ class MagicMissileScroll(Scroll):
                 e.take_damage(self.damage, DamageType.magic)
                 self.engine.messages.add(f'{e} suffers {self.damage} damage')
         self.engine.player.inventory.remove(self)
-
-class Spell:
-    pass
-
-class CureSelf(Spell):
-    hp = 5
-    mana = 5
-
-    def activate(self):
-        self.fighter.hp += self.hp
 
 class LightningScroll(Scroll):
     color = 127,25,155
@@ -924,16 +1006,24 @@ class SpecialData:
         self.conversations = {}
         self.levels = defaultdict(list)
         self.quests = {}
+        self.items = {}
         for obj in globals().values():
             try:
                 if issubclass(obj, Entity,) and hasattr(obj,'_loc'):
                     self.data[obj._loc] = obj
+
                 elif issubclass(obj, Conversation) and obj.id:
                     self.conversations[obj.id] = obj()
+
                 elif issubclass(obj, SpecialLevel) and obj.level:
                     self.levels[obj.level].append(obj)
+
                 elif issubclass(obj, Quest) and obj.id:
                     self.quests[obj.id] = obj
+
+                elif issubclass(obj, Item):
+                    self.items[obj.__class__.__name__] = obj.char, obj.color
+
             except TypeError:
                 pass
 

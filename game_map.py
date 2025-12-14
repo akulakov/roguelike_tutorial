@@ -242,10 +242,11 @@ class GameMap:
         for entity in sorted(self.entities, key=lambda x: x.render_order):
             loc = entity.loc
             if self.visible[loc.x, loc.y] and not player.blinded:
-                console.print(x=loc.x, y=loc.y, string=entity.char, fg=entity.color)
+                console.print(x=loc.x, y=loc.y, string=str(entity), fg=entity.color)
 
         f = engine.player.fighter
         console.print(x=0, y=45, string=f'[{engine.level+1:-2}]', fg=Color.white)
+        console.print(x=5, y=45, string=f'${engine.player.gold}', fg=Color.yellow)
         self.render_bar(console, f.hp, f.max_hp, 20)
         self.render_names_at_location(console, engine.mouse_loc, Loc(21,44))
         engine.messages.render(console, 21, 45, 40, 5)

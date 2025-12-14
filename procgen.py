@@ -145,15 +145,15 @@ item_chances = {
 }
 
 enemy_chances = {
-   0: [(E.Orc, 20), (E.Gremlin, 80)],
-   3: [(E.BroomTroll, 85)],
+   0: [(E.Orc, 20), (E.Mimic, 80)],
+   3: [(E.BroomTroll, 15)],
    5: [(E.Troll, 30)],
-   7: [(E.Troll, 60)],
-   8: [(E.ThwackingOrc, 40)],
-   9: [(E.BurningOrc, 40)],
-   10: [(E.ResoluteOrc, 40)],
-   11: [(E.KnurledGoblin, 40)],
-   12: [(E.MusculousGoblin, 40)],
+   7: [(E.Troll, 20)],
+   8: [(E.ThwackingOrc, 20)],
+   9: [(E.BurningOrc, 10)],
+   10: [(E.ResoluteOrc, 20)],
+   11: [(E.KnurledGoblin, 10)],
+   12: [(E.MusculousGoblin, 20)],
    13: [(E.SatyricGoblin, 40)],
    14: [(E.InsuperableTroll, 40)],
 }

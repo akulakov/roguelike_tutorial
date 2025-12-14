@@ -13,13 +13,6 @@ from procgen import generate_dungeon, generate_special_dungeon
 from input_handlers import EventHandler, MainMenu
 import libtcodpy
 
-"""
-TODO
-fast move stop -- check on both sides of corridor.
-fast move stop before water.
-some monsters are still not in `entities`.
-"""
-
 screen_width = 80
 screen_height = 50
 
@@ -311,5 +304,6 @@ def load_game(filename, maps_filename):
         print("engine.custom_maps", list(engine.custom_maps))
     # engine.player.blinded = 3
     p = engine.player
+    p.gold = 200
     p.inventory.add(entity.RingOfFreeAction(engine, entity=p))
     return engine
